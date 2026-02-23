@@ -1,4 +1,4 @@
-# test.py
+# test.py pull test
 from system import GreenValleySystem
 
 def run_test():
@@ -45,6 +45,53 @@ def run_test():
             print(f" - Tee Time: {b.slot.play_date}")
             print(f" - Booking Status: {b.slot.status.name}")
             print("-" * 20)
+
+    for b in sys.bookings:
+        print(f"Booking ID: {b.booking_id} | Requester: {b.requester.name} | Slot: {b.slot.play_date} | Golfers in Booking: {[g.name for g in b.golfers]}")
+    
+    # test.py (ส่วนต่อจากเดิม)
+
+    print("\n" + "="*50)
+    print(" TEST #4: MEMBER PLACING FOOD ORDER")
+    print(" (Using Dependency Injection via Member Object)")
+    print("="*50)
+
+    # 1. เตรียมข้อมูลที่จำเป็น
+    john = sys.users[0]             # ดึงออบเจกต์ Member (John Doe)
+    fried_rice = sys.find_product_by_id("P001")    # ดึงออบเจกต์ Product (Fried Rice)
+    b_id = sys.bookings[0].booking_id # ดึงเลขที่การจองที่ John ทำไว้
+
+    # 2. เริ่มการสั่งอาหารผ่านตัวออบเจกต์ Member โดยตรง
+    # สังเกตว่าเราส่ง 'sys' เข้าไปเป็นตัวแปรแรก เพื่อให้ john นำไปสั่งงานต่อได้
+    print(f"[Request] {john.name} wants to order {fried_rice.name}...")
+
+    order_success = john.place_order(
+        system=sys,          # ส่งออบเจกต์ System เข้าไป (นี่คือหัวใจสำคัญ)
+        booking_id=b_id,     # เลขที่การจอง
+        product=fried_rice,  # ออบเจกต์สินค้า
+        quantity=1           # จำนวน
+    )
+
+    # 3. ตรวจสอบผลลัพธ์ที่เกิดขึ้นในระบบหลัก (sys)
+    if order_success:
+        print("\n--- Current System State After Test #4 ---")
+        # ตรวจสอบว่า Order ล่าสุดถูกเพิ่มเข้าไปในลิสต์ของระบบหรือไม่
+        latest_order = sys.bookings[0].view_orders[-1] if sys.bookings[0].view_orders else None
+        if latest_order:
+            print(sys.bookings[0].view_orders[-1].total_price)  # แสดงรายละเอียด Order ล่าสุด
+        else:
+            print("Error: No orders found in the booking.")
+    else:
+        print("Test #4 Failed: Order could not be placed.")
+
+    print("\n" + "="*50)
+    print(" TEST #5: VIEW MEMBER NOTIFICATIONS")
+    print(" (Using Dependency Injection via Member Object)")
+    print("="*50)
+
+    print(f"Notifications for {john.name}:")
+    for n in john.view_notifications():
+        print(f" - {n}")
 
     print("\n" + "="*40)
     print(" TEST COMPLETED")
