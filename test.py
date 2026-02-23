@@ -1,5 +1,5 @@
 # test.py
-from data import GreenValleySystem
+from system import GreenValleySystem
 
 def run_test():
     # 1. เริ่มต้นระบบและโหลดข้อมูล (John และ Mary จะถูกสร้างอัตโนมัติ)
