@@ -23,3 +23,13 @@ class Member(Golfer):
         super().__init__(user_id, name, phone, current_handicap=handicap)
         self.tier = tier
         self.membership_expiry = datetime.now() + timedelta(days=365)
+        self.__notifications = []
+
+    def place_order(self, system, booking_id, product, quantity):
+        return system.place_order(booking_id, product, quantity)
+    
+    def add_notification(self, message):
+        self.__notifications.append(message)
+    
+    def view_notifications(self):
+        return self.__notifications
