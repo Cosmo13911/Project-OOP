@@ -13,8 +13,12 @@ class Booking:
         self.__orders = []
         self.__created_at = datetime.now()
         self.__golfers = [requester]
-        self.status = BookingStatus.PENDING_PAYMENT
-
+        self.__status = BookingStatus.PENDING_PAYMENT
+    def update_status(self, new_status):
+        self.__status = new_status
+    @property
+    def status(self):
+        return self.__status
     @property
     def requester(self):
         return self.__requester
