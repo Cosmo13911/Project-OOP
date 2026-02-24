@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException  # เพิ่ม HTTPException เข้ามา
+from fastapi import FastAPI, HTTPException, Body, Form, Query # เพิ่ม HTTPException เข้ามา
 from system import GreenValleySystem
+from typing import List
 
 app = FastAPI(
     title="Green Valley Management System", # เปลี่ยนชื่อโปรเจกต์ตรงนี้
@@ -30,7 +31,6 @@ def view_bookings():
         "requester": booking.requester.name, # สมมติว่า requester คือออบเจกต์ Member
         "orders": booking.view_orders , # นี่จะได้เป็นลิสต์ของ Order ออบเจกต์
     }
-
 @app.get("/view/product", tags=["User"])
 def view_products():
     products_list = []
@@ -47,12 +47,14 @@ def view_products():
     return {"products": products_list}
 
 
-@app.post("/order", tags=["User"])
-def place_order(booking_id: str, product_id: str, quantity: int):
-    product = sys.find_product_by_id(product_id)
-    if not product:
-        return {"error": "Product not found."}
-    john.place_order(sys, booking_id, product, quantity)
+@app.post("/place_order", tags=["User"])
+def place_order(
+    booking_id: str = Query("BK-001", description="รหัสการจอง"),
+    product_list: List[str] = Form(..., description="รูปแบบ: ID, Quantity, ID:P002, Quantity:2")
+    ):
+
+    john.place_order(sys, booking_id, product_list)
+    
     return {"message": "Order placed successfully."}
 
 # ==========================================

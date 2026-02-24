@@ -10,7 +10,7 @@ class Booking:
         self.__booking_id = booking_id
         self.__requester = requester
         self.__slot = slot
-        self.__orders = []
+        self.__order = None
         self.__created_at = datetime.now()
         self.__golfers = [requester]
         self.status = BookingStatus.PENDING_PAYMENT
@@ -33,10 +33,10 @@ class Booking:
     
     @property
     def view_orders(self):
-        return self.__orders
+        return self.__order
     
     def add_order(self, order):
-        self.__orders.append(order)
+        self.__order = order
 
     def add_golfers(self, golfers_list):
             for g in golfers_list:

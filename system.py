@@ -85,11 +85,11 @@ class GreenValleySystem:
 
         # สร้างสินค้าในร้านอาหาร (Menu)
         menu_items = [
-            Product("P001", "Fried Rice with Shrimp", 120),
-            Product("P002", "Iced Americano", 65),
-            Product("P003", "Club Sandwich", 150),
-            Product("P004", "Singha Beer (Can)", 90),
-            Product("P005", "Mineral Water", 20)
+            Product("P001", "Fried Rice with Shrimp", 119),
+            Product("P002", "Iced Americano", 69),
+            Product("P003", "Club Sandwich", 77),
+            Product("P004", "Papaya Pokpok", 999),
+            Product("P005", "Mineral Water", 17)
         ]
 
         for menu in menu_items:
@@ -152,30 +152,40 @@ class GreenValleySystem:
         return None
     
     # ------------------- order ----------------------- #
-    def create_order(self, product, quantity):
+    def create_order(self, product_list, requester):
         order = Order()
-        item = self.create_item(product, quantity)
-        order.add_item(item)
+
+        for i in range(0, len(product_list[0].split(',')), 2):
+            product_id = product_list[0].split(',')[i]
+            quantity = int(product_list[0].split(',')[i+1])
+
+            product = self.find_product_by_id(product_id)
+            if not product:
+                return {"error": "Product not found."}
+            
+            item = self.create_item(product, quantity)
+            order.add_item(item)
+            self.create_notification(requester, f"Your order for {quantity} x {product.name} has been placed successfully.")
+
+
         return order
 
     def create_item(self, product, quantity):
         item = OrderItem(product, quantity)
         return item
     
-    def place_order(self, booking_id, product, quantity):
-        print(f"[System] Placing order for Booking ID: {booking_id} | Product: {product.name} | Price: {product.price} | Quantity: {quantity}")
-        booking = self.find_booking_by_id(booking_id)
+    def place_order(self, booking_id, product_list):
+        print(f"[System] Placing order for Booking ID: {booking_id} ")
 
+        booking = self.find_booking_by_id(booking_id)
         if not booking:
             return "Error: You have to booking first."
 
-        order = self.create_order(product, quantity)
+        order = self.create_order(product_list, booking.requester)
         order.calculate_total()
 
-        booking = self.find_booking_by_id(booking_id)
         booking.add_order(order)
 
-        self.create_notification(booking.requester, f"Your order for {quantity} x {product.name} has been placed successfully.")
         return "Order placed successfully."
     
     def find_product_by_id(self, product_id):

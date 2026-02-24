@@ -25,8 +25,8 @@ class Member(Golfer):
         self.membership_expiry = datetime.now() + timedelta(days=365)
         self.__notifications = []
 
-    def place_order(self, system, booking_id, product, quantity):
-        return system.place_order(booking_id, product, quantity)
+    def place_order(self, system, booking_id, product_list):
+        return system.place_order(booking_id, product_list)
     
     def add_notification(self, message):
         self.__notifications.append(message)
