@@ -1,5 +1,5 @@
+from fastapi import FastAPI, HTTPException  # เพิ่ม HTTPException เข้ามา
 from system import GreenValleySystem
-from fastapi import FastAPI
 
 app = FastAPI(
     title="Green Valley Management System", # เปลี่ยนชื่อโปรเจกต์ตรงนี้
@@ -31,12 +31,6 @@ def view_bookings():
         "orders": booking.view_orders , # นี่จะได้เป็นลิสต์ของ Order ออบเจกต์
     }
 
-@app.get("/view/notibooking", tags=["User"])
-def view_notification():
-    john.view_notifications()[0] if john.view_notifications() else "No notifications"
-    return {"Notification":    john.view_notifications()[0] if john.view_notifications() else "No notifications"
-}
-
 @app.get("/view/product", tags=["User"])
 def view_products():
     products_list = []
@@ -60,3 +54,103 @@ def place_order(booking_id: str, product_id: str, quantity: int):
         return {"error": "Product not found."}
     john.place_order(sys, booking_id, product, quantity)
     return {"message": "Order placed successfully."}
+
+# ==========================================
+# หมวด User (รวมฟังก์ชันของนักกอล์ฟทั้งหมด)
+# ==========================================
+
+@app.get("/user/tournaments", tags=["User"])
+def view_all_tournaments():
+    """User: ดูรายการแข่งขันที่เปิดรับสมัครทั้งหมด"""
+    if len(sys.tournaments) == 0:
+        return {"message": "No tournaments available right now."}
+    
+    t_list = []
+    for t in sys.tournaments:
+        t_list.append({
+            "id": t.tournamentID,
+            "name": t.name,
+            "date": t.date,
+            "entry_fee": t.entryFee,
+            "status": t.status.value,
+            "registered_count": len(t.registeredPlayers)
+        })
+    return {"tournaments": t_list}
+
+@app.post("/user/tournament/register", tags=["User"])
+def register_tournament(member_id: str = "M-001", tour_id: str = "T-001"):
+    """User (Phase 1): สมัครเข้าร่วมแข่งขันและรับบิลชำระเงิน"""
+    # 1. รับค่าที่ระบบส่งกลับมาเก็บไว้ในตัวแปร result ก่อน
+    result = sys.register_tournament_get_payment(member_id, tour_id)
+
+    # 2. เช็คว่ามีคำว่า "error" ในผลลัพธ์ไหม
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+        
+    # 3. ถ้าไม่มี Error ค่อย return ผลลัพธ์กลับไปให้ User
+    return result
+
+@app.post("/user/tournament/pay", tags=["User"])
+def process_payment(payment_id: str = "PAY-001"):
+    """User (Phase 1): ชำระเงินและยืนยันการเข้าร่วม"""
+    # ทำแบบเดียวกันกับฟังก์ชันจ่ายเงินด้วยครับ
+    result = sys.process_payment(payment_id)
+    
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+        
+    return result
+
+@app.get("/user/notifications", tags=["User"])
+def view_user_notifications(member_id: str = "M-001"):
+    """User: เช็คกล่องข้อความแจ้งเตือนของตัวเองผ่าน Member ID"""
+    
+    # 1. ค้นหาตัวตนของผู้ใช้ในระบบ
+    member = sys.find_user_by_id(member_id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    
+    # 2. เรียกใช้เมธอด view_notifications() ตามที่ออกแบบไว้ใน Class Diagram
+    notifications = member.view_notifications()
+    
+    # 3. ตรวจสอบว่ามีแจ้งเตือนหรือไม่
+    if not notifications:
+        return {"member_name": member.name, "message": "You have no new notifications."}
+    
+    # 4. ส่งรายการแจ้งเตือนทั้งหมดกลับไปให้แสดงผลบนหน้าจอ UI
+    return {
+        "member_name": member.name, 
+        "total_notifications": len(notifications),
+        "notifications": notifications
+    }
+
+# ==========================================
+# หมวด Admin (ฝั่งเจ้าหน้าที่ระบบ)
+# ==========================================
+
+@app.post("/admin/tournament/create", tags=["Admin"])
+def admin_create_tournament(name: str = "Green Valley Masters", date: str = "2024-12-01", fee: float = 2500.0):
+    """Admin (Phase 0): สร้างรายการแข่งขันใหม่"""
+    t_id = sys.create_tournament(name, date, fee)
+    return {"message": "Tournament created successfully", "tournamentID": t_id}
+
+@app.get("/admin/tournament/players", tags=["Admin"])
+def admin_view_tournament_players(tour_id: str = "T-001"):
+    """Admin: ตรวจสอบจำนวนและรายชื่อผู้ที่สมัครเข้าแข่งขัน (กรอก Tournament ID)"""
+    result = sys.get_tournament_players(tour_id)
+    
+    # ถ้าพิมพ์รหัส Tournament ผิด ให้เด้ง Error 404
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+        
+    return result
+
+@app.post("/admin/tournament/close_and_pair", tags=["Admin"])
+def admin_close_registration_and_pair(tour_id: str = "T-001"):
+    """Admin (Phase 2): ปิดรับสมัคร จัดก๊วนอัตโนมัติ สร้าง Booking และส่งแจ้งเตือน"""
+    result = sys.close_registration_and_pairing(tour_id)
+    
+    if "Error" in result or "not found" in result:
+        raise HTTPException(status_code=400, detail=result)
+        
+    return {"message": result, "status": "Draw Published & Notifications Sent"}
