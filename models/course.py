@@ -15,3 +15,9 @@ class TeeTimeSlot:
         self.play_date = play_date
         self.course = course
         self.status = SlotStatus.AVAILABLE
+
+        # สร้างคลาสใหม่สืบทอด (Inherit) จาก TeeTimeSlot ตาม Requirement
+class Course1Reserve(TeeTimeSlot):
+    def __init__(self, play_date, course):
+        super().__init__(play_date, course)
+        self.hole = 1 # ระบุชัดเจนว่าเป็นสล็อตสำหรับเริ่มที่หลุม 1

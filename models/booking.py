@@ -1,4 +1,9 @@
 from datetime import datetime
+from enum import Enum
+
+class BookingStatus(Enum):
+    PENDING_PAYMENT = "PENDING_PAYMENT"
+    CONFIRMED_PAID = "CONFIRMED_PAID"   
 
 class Booking:
     def __init__(self, booking_id, requester, slot):
@@ -8,6 +13,7 @@ class Booking:
         self.__orders = []
         self.__created_at = datetime.now()
         self.__golfers = [requester]
+        self.status = BookingStatus.PENDING_PAYMENT
 
     @property
     def requester(self):
@@ -31,3 +37,8 @@ class Booking:
     
     def add_order(self, order):
         self.__orders.append(order)
+
+    def add_golfers(self, golfers_list):
+            for g in golfers_list:
+                if g not in self.__golfers:
+                    self.__golfers.append(g)
