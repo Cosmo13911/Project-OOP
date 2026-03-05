@@ -167,7 +167,6 @@ class GreenValleySystem:
             order.add_item(item)
             self.create_notification(requester, f"Your order for {quantity} x {product.name} has been placed successfully.")
 
-
         return order
 
     def create_item(self, product, quantity):
@@ -198,13 +197,13 @@ class GreenValleySystem:
 # ในคลาส GreenValleySystem (ไฟล์ system.py)
     def create_notification(self, member, details):
         # 1. สร้างอ็อบเจกต์ Notification ขึ้นมา
-        new_noti = Notification(
-            title="แจ้งเตือนเวลาออกรอบ (Tee Time)", 
-            message=details
-        )
+        # new_noti = Notification(
+        #     title="แจ้งเตือนเวลาออกรอบ (Tee Time)", 
+        #     message=details
+        # )
         
         # 2. ส่งอ็อบเจกต์นี้เข้าไปเก็บในตัว Member
-        member.add_notification(new_noti)
+        member.add_notification(details)
     # ==========================================
     # Tournament Flow (Phase 0, 1, 2)
     # ==========================================

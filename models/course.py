@@ -15,6 +15,14 @@ class Course:
         self.__greenfee = greenfee
         self.__type = course_type # เก็บชนิดสนาม
         self.__slots = []
+        self.__holes = {}  # เก็บเป็น Dictionary {เลขหลุม: Object หลุม}
+        self.__rating = rating
+        self.__slope_rating = slope_rating
+
+    @property
+    def id(self):  
+        return self.__id
+
     @property
     def name(self):
         return self.__name
