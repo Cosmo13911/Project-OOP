@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
-from models.users import Member, Tier
-from models.course import Course, TeeTimeSlot, SlotStatus , Course1Reserve
+from models.users import Member, Tier, Notification
+from models.course import Course, TeeTimeSlot, SlotStatus, Course1Reserve, CourseType
 from models.booking import Booking, BookingStatus
 from models.order import Order, OrderItem, Product
-from models.tournament import Tournament, TournamentStatus
+from models.tournament import Tournament, TournamentStatus, Prize
 from models.payment import Payment, PaymentType, PaymentStatus
 
 class GreenValleySystem:
@@ -31,9 +31,6 @@ class GreenValleySystem:
     def products(self):
         return self.__products
 
-    @property
-    def products(self):
-        return self.__products
 
     # ----- เพิ่มโค้ดส่วนนี้ -----
     @property
@@ -57,7 +54,11 @@ class GreenValleySystem:
     def create_data(self):
         print("--- [System] Initializing Modular Data ---")
         # สร้างสนาม
-        c1 = Course("Green Valley Championship", 3500)
+        c1 = Course("Green Valley Championship", 3500, CourseType.CHAMPIONSHIP)        
+        c2 = Course("River Executive Course", 2000, CourseType.EXECUTIVE)
+        
+        self.__courses.append(c1)
+        self.__courses.append(c2)
         
 # ==========================================
         # 🌟 ระบบสร้าง Slot อัตโนมัติ (Auto-Generate Slots)
@@ -74,7 +75,7 @@ class GreenValleySystem:
             time_str = current_time.strftime("%Y-%m-%d %H:%M")
             
             # สร้างสล็อตและยัดเข้าสนาม
-            c1.slots.append(TeeTimeSlot(time_str, c1))
+            c1.add_slot(TeeTimeSlot(time_str, c1))
             c1.slots.append(Course1Reserve(time_str, c1))
             
             # 3. บวกเวลาเพิ่มทีละ 15 นาที สำหรับสล็อตถัดไป
@@ -98,7 +99,6 @@ class GreenValleySystem:
         tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
         c1.slots.append(TeeTimeSlot(f"{tomorrow} 08:00", c1))
         c1.slots.append(TeeTimeSlot(f"{tomorrow} 09:00", c1))
-        self.__courses.append(c1)
         
         # สร้างสมาชิก
         self.add_member("John Doe", "081-222-3333", Tier.PLATINUM, 12.5)
@@ -167,7 +167,6 @@ class GreenValleySystem:
             order.add_item(item)
             self.create_notification(requester, f"Your order for {quantity} x {product.name} has been placed successfully.")
 
-
         return order
 
     def create_item(self, product, quantity):
@@ -195,19 +194,36 @@ class GreenValleySystem:
         return None
     
 # -------------- notification ------------------ #
-    def create_notification(self, member, message):
-        member.add_notification(message)    
+# ในคลาส GreenValleySystem (ไฟล์ system.py)
+    def create_notification(self, member, details):
+        # 1. สร้างอ็อบเจกต์ Notification ขึ้นมา
+        # new_noti = Notification(
+        #     title="แจ้งเตือนเวลาออกรอบ (Tee Time)", 
+        #     message=details
+        # )
         
+        # 2. ส่งอ็อบเจกต์นี้เข้าไปเก็บในตัว Member
+        member.add_notification(details)
     # ==========================================
     # Tournament Flow (Phase 0, 1, 2)
     # ==========================================
     
-    def create_tournament(self, name, date, fee):
-        # Phase 0: Create Tournament
+# 🌟 เปลี่ยนให้รับพารามิเตอร์ Dropdown
+    def create_tournament(self, name, date, fee, course_type: CourseType):
+        # 1. ค้นหาสนามที่มี Type ตรงกับที่ Admin เลือกจาก Dropdown
+        selected_course = next((c for c in self.__courses if c.type == course_type), None)
+        if not selected_course:
+            return {"error": f"Course type '{course_type.value}' not found in the system."}
+
+        # 2. สร้างงานแข่ง
         t_id = f"T-{len(self.__tournaments) + 1:03d}"
         new_tour = Tournament(t_id, name, date, fee)
+        
+        # 3. บันทึกข้อมูลสนามและรางวัล
+        new_tour.set_course(selected_course)
+        
         self.__tournaments.append(new_tour)
-        return t_id
+        return {"tournamentID": t_id, "course_assigned": selected_course.name}
 
     def find_tournament_by_id(self, tour_id):
         for t in self.__tournaments:
@@ -287,26 +303,30 @@ class GreenValleySystem:
         tour.updateStatus(TournamentStatus.CLOSED)
         pairings = tour.generatePairing()
         
-        if len(self.__courses) == 0:
-            return "Error: No courses available"
-        course = self.__courses[0] 
+        # 🌟 1. ดึงสนามและวันที่ มาจากข้อมูลงานแข่งโดยตรง
+        course = tour.course 
+        target_date = tour.date # สมมติว่าเก็บค่าเป็น "2026-12-02"
+        
+        # 🌟 2. สั่งให้ระบบเตรียมสล็อตของ "วันนั้น" ให้พร้อม
+        self.ensure_slots_for_date(course, target_date)
         
         # Loop Every 4 Players
         for group in pairings:
-            # หาสล็อตที่ว่างถัดไป
-            available_slot = next((s for s in course.slots if s.status == SlotStatus.AVAILABLE), None)
+            # 🌟 3. หาสล็อตว่าง "เฉพาะของวันที่จัดแข่งเท่านั้น" (กันพลาดไปดึงของวันอื่น)
+            available_slot = next((s for s in course.slots if s.status == SlotStatus.AVAILABLE and s.play_date.startswith(target_date)), None)
             
             if available_slot:
                 b_id = f"BK-{len(self.__bookings) + 1:03d}"
                 new_booking = Booking(b_id, group[0], available_slot) # คนแรกเป็น Requester
-                new_booking.status = BookingStatus.CONFIRMED_PAID
+                new_booking.update_status(BookingStatus.CONFIRMED_PAID)
                 new_booking.add_golfers(group[1:]) # ยัดคนที่เหลือเข้าก๊วน
                 
-                available_slot.status = SlotStatus.RESERVED
+                # เปลี่ยนสถานะเป็น RESERVED เพื่อไม่ให้ก๊วนอื่นมาแย่ง (ป้องกันคิวชน)
+                available_slot.update_status(SlotStatus.RESERVED)
                 self.__bookings.append(new_booking)
-                tour.matchBookings.append(new_booking)
+                tour.add_match_booking(new_booking)
 
-                # แจ้งเตือน Notification ตามที่เขียนใน Sequence Diagram
+                # แจ้งเตือน Notification ตอนนี้จะเป็นเวลาและวันที่ที่ถูกต้องแล้ว
                 details = f"Tee Time Assigned: {available_slot.play_date} for Tournament: {tour.name}"
                 for member in group:
                     self.create_notification(member, details)
@@ -314,4 +334,20 @@ class GreenValleySystem:
         tour.updateStatus(TournamentStatus.DRAW_PUBLISHED)
         return f"Draw Published. {len(pairings)} groups assigned."
     
-    
+    def ensure_slots_for_date(self, course, date_str):
+        # 1. เช็คว่าสนามนี้ ในวันที่กำหนด (date_str) มีการสร้าง Slot ไว้หรือยัง
+        existing_slots = [s for s in course.slots if s.play_date.startswith(date_str)]
+        if existing_slots:
+            return  # ถ้ามีแล้ว ไม่ต้องสร้างใหม่ ให้ใช้ของเดิมที่มีอยู่ (เพื่อจะได้เช็คคิวชนได้)
+
+        # 2. ถ้ายังไม่มี ให้สร้างใหม่ตั้งแต่ 06:00 - 18:00 ตามวันที่กรอกเข้ามา
+        start_time = datetime.strptime(f"{date_str} 06:00", "%Y-%m-%d %H:%M")
+        end_time = datetime.strptime(f"{date_str} 18:00", "%Y-%m-%d %H:%M")
+        current_time = start_time
+        
+        while current_time <= end_time:
+            time_str = current_time.strftime("%Y-%m-%d %H:%M")
+            course.slots.append(TeeTimeSlot(time_str, course))
+            current_time += timedelta(minutes=15)
+            
+        print(f"✅ Generated new slots for {course.name} on {date_str}")
