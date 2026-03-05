@@ -16,8 +16,6 @@ class Course:
         self.__type = course_type # เก็บชนิดสนาม
         self.__slots = []
         self.__holes = {}  # เก็บเป็น Dictionary {เลขหลุม: Object หลุม}
-        self.__rating = rating
-        self.__slope_rating = slope_rating
 
     @property
     def id(self):  
