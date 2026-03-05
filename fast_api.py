@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException  # เพิ่ม HTTPException เข้ามา
+from fastapi import FastAPI, HTTPException # เพิ่ม HTTPException เข้ามา
 from system import GreenValleySystem
 
 app = FastAPI(
@@ -156,69 +156,73 @@ def admin_close_registration_and_pair(tour_id: str = "T-001"):
         raise HTTPException(status_code=400, detail=result)
         
     return {"message": result, "status": "Draw Published & Notifications Sent"}
+@app.post("/admin/tournament/start", tags=["Admin"])
+def admin_start_tournament(tour_id: str = "T-001"):
+    result=sys.start_tournament(tour_id)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
 @app.post("/admin/tournament/score", tags=["Admin"])
 def record_player_score(
     tour_id: str = "T-001", 
     member_id: str = "M-001", 
-    hole_number: int = 1, 
-    stroke: int = 4
+    hole1: int = 0, hole2: int = 0, hole3: int = 0, hole4: int = 0, hole5: int = 0, hole6: int = 0,
+    hole7: int = 0, hole8: int = 0, hole9: int = 0, hole10: int = 0, hole11: int = 0, hole12: int = 0,
+    hole13: int = 0, hole14: int = 0, hole15: int = 0, hole16: int = 0, hole17: int = 0, hole18: int = 0
 ):
-    """Admin: กรอกคะแนนให้ผู้เล่นในทัวร์นาเมนต์ (ระบบจะคำนวณ Double Par ให้อัตโนมัติ)"""
+    """Admin: กรอกคะแนนให้ผู้เล่น (ระบบย้ายไปประมวลผลที่หลังบ้าน)"""
     
-    # 1. ค้นหาทัวร์นาเมนต์
-    target_tour = None
-    for t in sys.tournaments:
-        if t.tournamentID == tour_id:
-            target_tour = t
-            break
-            
-    if not target_tour:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-    if target_tour.status != "IN_PROGRESS":
-        raise HTTPException(status_code=404, detail="Tournament not found")
-    # 2. ค้นหาผู้เล่น
-    target_member = sys.find_user_by_id(member_id)
-    if not target_member:
-        raise HTTPException(status_code=404, detail="Member not found")
-
-    # 3. บันทึกคะแนน (ใช้ฟังก์ชันจากคลาส Tournament ที่เราทำไว้)
-    success = target_tour.record_player_score(target_member, hole_number, stroke)
-    
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to record score. Player might not be registered or hole is invalid.")
-        
-    return {
-        "message": f"Score recorded successfully for {target_member.name}",
-        "hole": hole_number,
-        "input_stroke": stroke
+    # 1. จับมัดรวมตัวแปร 18 ช่องให้เป็น Dictionary
+    scores_input = {
+        1: hole1, 2: hole2, 3: hole3, 4: hole4, 5: hole5, 6: hole6,
+        7: hole7, 8: hole8, 9: hole9, 10: hole10, 11: hole11, 12: hole12,
+        13: hole13, 14: hole14, 15: hole15, 16: hole16, 17: hole17, 18: hole18
     }
+
+    # 🌟 2. โยนให้หลังบ้าน (system.py) คำนวณรวดเดียว!
+    result = sys.record_tournament_scores(tour_id, member_id, scores_input)
+    
+    # 3. ตรวจสอบคำตอบจากหลังบ้าน
+    if isinstance(result, str): 
+        # ถ้า system.py ส่งกลับมาเป็นตัวหนังสือ (แปลว่าเกิด Error)
+        raise HTTPException(status_code=400, detail=result)
+        
+    # ถ้าทำงานสำเร็จ (ส่งกลับมาเป็น Dictionary) ก็ให้หน้าเว็บโชว์ข้อมูลได้เลย
+    return result
 
 @app.get("/tournament/leaderboard", tags=["User", "Admin"])
 def view_tournament_leaderboard(tour_id: str = "T-001"):
     """User/Admin: ดูตารางผู้นำ (Leaderboard) แบบ Real-time หักลบแต้มต่อ (Handicap) แล้ว"""
     
-    # 1. ค้นหาทัวร์นาเมนต์
-    target_tour = None
-    for t in sys.tournaments:
-        if t.tournamentID == tour_id:
-            target_tour = t
-            break
-            
-    if not target_tour:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-
-    # 2. ดึงข้อมูล Leaderboard (จากคลาส Tournament ของเรา)
     try:
-        board_data = target_tour.get_leaderboard()
+        result = sys.get_tournament_leaderboard(tour_id)
+        
+        # 2. เช็คว่าหลังบ้านส่ง Error กลับมาไหม
+        if isinstance(result, str):
+            # ถ้าเป็นข้อความ (String) แปลว่าหาไม่เจอ
+            raise HTTPException(status_code=404, detail=result)
+            
+        # 3. ส่งข้อมูลกลับให้หน้าเว็บสวยๆ
+        return result
     except Exception as e:
+        # ดักจับ Error เผื่อคลาส Leaderboard ของคุณพังหรือมีปัญหา
         raise HTTPException(status_code=500, detail=f"Error generating leaderboard: {str(e)}")
-
-    # 3. ตรวจสอบว่ามีคนมีคะแนนหรือยัง
-    if not board_data:
-        return {"message": "No scores recorded yet.", "tournament": target_tour.name}
-
+@app.post("/admin/tournament/end", tags=["Admin"])
+def admin_end_tournament(tour_id: str = "T-001"):
+    """Admin: จบการแข่งขันทัวร์นาเมนต์ (เปลี่ยนสถานะเป็น COMPLETED)"""
+    
+    # 1. โยนคำสั่งให้ระบบหลังบ้าน (system.py) ทำงาน
+    result = sys.end_tournament(tour_id)
+    
+    # 2. เช็คผลลัพธ์ที่ตอบกลับมาจากหลังบ้าน
+    # เนื่องจากหลังบ้านของคุณเขียนส่งกลับมาเป็นคำว่า "Error: ..." เราก็เอามาเช็คตรงนี้ได้เลยครับ
+    if result.startswith("Error:"):
+        # ถ้ามี Error หาไม่เจอ หรือสถานะไม่ได้กำลังแข่ง ให้เด้ง HTTP 400
+        raise HTTPException(status_code=400, detail=result)
+        
+    # 3. ถ้าสำเร็จ (เป็นคำว่า Success: ...) ก็ตอบกลับหน้าเว็บสวยๆ
     return {
-        "tournament_name": target_tour.name,
-        "total_players": len(target_tour.registeredPlayers),
-        "leaderboard": board_data
+        "message": result,
+        "tour_id": tour_id,
+        "status": "COMPLETED"
     }

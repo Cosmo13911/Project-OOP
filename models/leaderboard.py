@@ -3,6 +3,8 @@ class Leaderboard:
         self.__scorecards = scorecards 
 
     def generate(self):
+        if self.__scorecards==None:
+            return "Empty scorecards"
         results = []
         for scorecard in self.__scorecards:
             if scorecard.has_recorded_scores(): 

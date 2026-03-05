@@ -13,49 +13,58 @@ class Hole:
     def par(self):
         return self.__par
 class Course:
-    def __init__(self, course_id, name, greenfee,par,rating,slope_rating):
+    # 🌟 1. เอา 'par' ออกจากพารามิเตอร์ของ __init__
+    def __init__(self, course_id, name, greenfee, rating, slope_rating):
         if not course_id.startswith("C-"):
             raise ValueError(f"Course ID '{course_id}' ต้องขึ้นต้นด้วย 'C-' เท่านั้น!")
+            
         self.__id = course_id
         self.__name = name
         self.__greenfee = greenfee
         self.__slots = []
-        self.__holes = {}
-        self.__par=par
-        self.__rating=rating
-        self.__slope_rating=slope_rating
+        self.__holes = {}  # เก็บเป็น Dictionary {เลขหลุม: Object หลุม}
+        
+        # self.__par = par  <-- 🌟 ลบบรรทัดนี้ทิ้งได้เลย
+        self.__rating = rating
+        self.__slope_rating = slope_rating
+
     @property
-    def id(self):  # 🌟 เพิ่ม property สำหรับดึง ID
+    def id(self):  
         return self.__id
+
     @property
     def name(self):
         return self.__name
-        
+
     @property
     def par(self):
-        return self.__par
-        
+        # 🌟 2. ให้มันคำนวณพาร์รวมของสนาม จากพาร์ของทุกหลุมมารวมกัน! (Dynamic Calculation)
+        # ถ้ายังไม่มีหลุมเลย ผลรวมจะเป็น 0 อัตโนมัติ
+        return sum(hole.par for hole in self.__holes.values())
+
     @property
     def rating(self):
         return self.__rating
-        
+
     @property
     def slope_rating(self):
         return self.__slope_rating
+
     @property
     def slots(self):
         return self.__slots
+
     def add_hole(self, number, par, stroke_index, distance=0):
-        # ฟังก์ชันสำหรับเพิ่มข้อมูลหลุมเข้าไปในสนาม
+        # 🌟 3. สร้าง Object Hole ภายในนี้เลย (Composition) ถูกหลัก OOP สุดๆ
         self.__holes[number] = Hole(number, par, stroke_index, distance)
+
     def get_hole_par(self, number):
-        # ดึงข้อมูลหลุมที่ i ออกมาจาก dictionary __holes
         hole = self.__holes.get(number)
         if hole:
-            return hole.par # คืนค่าพาร์ (เช่น 4) กลับไปคำนวณคะแนน
-        return 0
+            return hole.par
+        raise ValueError(f"ไม่พบข้อมูลหลุมที่ {number} ในสนามนี้") # 🌟 ดัก Error ให้ชัดเจนขึ้นแทนการ return 0
+
     def get_hole_info(self, number):
-        # ฟังก์ชันดึงข้อมูลหลุมมาดู
         return self.__holes.get(number)
 class TeeTimeSlot:
     def __init__(self, play_date, course):

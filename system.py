@@ -58,7 +58,7 @@ class GreenValleySystem:
     def create_data(self):
         print("--- [System] Initializing Modular Data ---")
         # สร้างสนาม
-        c1 = Course("C-001","Green Valley Championship", 3500, 72, 72.5, 130)
+        c1 = Course("C-001","Green Valley Championship", 3500, 72.5, 130)
         for i in range(1, 19):
             # ใช้เมธอด add_hole(number, par, stroke_index, distance)
             # เพื่อความง่ายในการเทสต์ สมมติให้ทุกหลุมเป็นพาร์ 4, ความยาก (stroke_index) เรียงตามเลขหลุม, ระยะ 400 หลา
@@ -338,16 +338,41 @@ class GreenValleySystem:
         # 4. Action: เปลี่ยนสถานะเป็นกำลังแข่ง
         tour.set_to_in_progress()
         return f"Success: Tournament {tour_id} is now IN_PROGRESS"
-    def record_tournament_score(self, tour_id, member_id, hole_number, stroke):
-        tour = self.find_tournament_by_id(tour_id)
+    def record_tournament_scores(self, tour_id, member_id, scores_dict):
+        # 1. ตรวจสอบข้อมูลพื้นฐาน
         member = self.find_user_by_id(member_id)
-        if tour.status != TournamentStatus.IN_PROGRESS:
-            return f"Error: Tournament status is {tour.status.value}. IN_PROGRESS."
-        if not tour or not member:
-            return "Error: Member is not registered"
+        tour = self.find_tournament_by_id(tour_id)
+        
+        if not tour: return "Tournament not found"
+        if tour.status != "IN_PROGRESS": return "Tournament is not in progress"
+        if not member: return "Member not found"
+
+        recorded_holes = {} 
+
+        # 2. วนลูปบันทึกคะแนน
+        for current_hole, current_stroke in scores_dict.items():
+            if current_stroke == 0:
+                continue  
+                
+            if current_stroke < 0:
+                return f"คะแนนหลุม {current_hole} ติดลบไม่ได้"
+
+            # 🌟 เรียกใช้เมธอดบันทึกทีละหลุม (สังเกตว่าใช้ tour และ member)
+            success = tour.record_player_score(member, current_hole, current_stroke)
             
-        # 🌟 เรียกใช้ชื่อนี้แทน
-        return tour.record_player_score(member, hole_number, stroke)
+            if not success:
+                return f"Failed to record score for hole {current_hole}. Invalid hole or player."
+                
+            recorded_holes[current_hole] = current_stroke
+
+        # 3. สรุปผลและส่งค่ากลับ
+        if not recorded_holes:
+            return "No scores recorded. All inputs were 0."
+
+        return {
+            "message": f"Score recorded successfully for {member.name}",
+            "recorded_data": recorded_holes  
+        }
     def get_tournament_leaderboard(self, tour_id):
         tour = self.find_tournament_by_id(tour_id)
         if not tour:
