@@ -2,6 +2,9 @@ from fastapi import FastAPI, HTTPException, Body, Form, Query # เพิ่ม 
 from system import GreenValleySystem
 from typing import List
 
+from models.course import CourseType
+from models.tournament import Prize
+
 app = FastAPI(
     title="Green Valley Management System", # เปลี่ยนชื่อโปรเจกต์ตรงนี้
     description="ระบบจัดการสนามกอล์ฟและการสั่งอาหารสำหรับสมาชิก", # คำอธิบายระบบ
@@ -131,10 +134,21 @@ def view_user_notifications(member_id: str = "M-001"):
 # ==========================================
 
 @app.post("/admin/tournament/create", tags=["Admin"])
-def admin_create_tournament(name: str = "Green Valley Masters", date: str = "2024-12-01", fee: float = 2500.0):
-    """Admin (Phase 0): สร้างรายการแข่งขันใหม่"""
-    t_id = sys.create_tournament(name, date, fee)
-    return {"message": "Tournament created successfully", "tournamentID": t_id}
+def admin_create_tournament(
+    name: str = "Green Valley Masters", 
+    date: str = "2026-02-24", 
+    fee: float = 2500.0,
+    course_type: CourseType = CourseType.CHAMPIONSHIP # 🌟 นี่คือการทำ Dropdown เลือกสนาม
+):
+    """Admin (Phase 0): สร้างรายการแข่งขันใหม่ และเลือกรางวัล/สนาม"""
+    
+    # ส่งค่าเข้าสู่ระบบหลังบ้าน
+    result = sys.create_tournament(name, date, fee, course_type)
+    
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+        
+    return {"message": "Tournament created successfully", "details": result}
 
 @app.get("/admin/tournament/players", tags=["Admin"])
 def admin_view_tournament_players(tour_id: str = "T-001"):
