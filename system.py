@@ -79,7 +79,7 @@ class GreenValleySystem:
             c1.slots.append(Course1Reserve(time_str, c1))
             
             # 3. บวกเวลาเพิ่มทีละ 15 นาที สำหรับสล็อตถัดไป
-            current_time += timedelta(minutes=15) 
+            current_time += timedelta(minutes=15)  # --> 10.15 10.30
             
         print(f"✅ Generated {len(c1.slots)} slots for {c1.name}")
 
