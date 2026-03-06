@@ -308,6 +308,7 @@ def walk_in_booking(
         validate_phone(p)
     
     # เช็คจำนวนคนในก๊วนทั้งหมด (1 ก๊วน ไม่เกิน 4 คน)
+    # เช็คจำนวนคนรวมหัวหน้าก๊วน
     if len(companion_phones) + 1 > 4: 
         raise HTTPException(400, "ก๊วนนึงรับได้สูงสุด 4 คนเท่านั้น")
     
@@ -371,6 +372,7 @@ def select_addons(booking_id: str,
     total_requested_caddies = len(specific_caddies) + random_caddy_count
 
     # กฎ: 1 ผู้เล่นต่อ 1 แคดดี้
+    # 📌 กฎเหล็ก: 1 ผู้เล่นต่อ 1 แคดดี้เท่านั้น (ห้ามขาดห้ามเกิน)
     if total_requested_caddies != total_golfers:
         raise HTTPException(400, f"จำนวนแคดดี้ไม่ถูกต้อง! ก๊วนนี้มี {total_golfers} คน ต้องเลือกแคดดี้ให้ครบ {total_golfers} ท่าน (1:1)")
     

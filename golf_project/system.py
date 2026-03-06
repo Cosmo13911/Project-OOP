@@ -5,7 +5,7 @@ from models.course import Course, TeeTimeSlot, SlotStatus , Course1Reserve
 from models.booking import Booking, BookingStatus
 from models.order import Order, OrderItem, Product
 from models.tournament import Tournament, TournamentStatus
-from models.payment import Payment, PaymentType, PaymentStatus, Raincheck
+from models.payment import Payment, PaymentType, PaymentStatus, Raincheck, RainCheckStatus
 from models.course import SlotStatus, CourseType
 from models.resources import Caddy, CaddyLevel, GolfCart, CartType
 
@@ -323,6 +323,7 @@ class GreenValleySystem:
             return voucher.amount
         return -1
     
+
     def process_booking_payment(self, payment_id: str):
         # 1. ค้นหาออบเจกต์ Payment จากลิสต์ในระบบ
         payment = next((p for p in self.__payments if p.paymentID == payment_id), None)

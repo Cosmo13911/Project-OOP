@@ -137,6 +137,12 @@ class Member(Golfer):
     def place_order(self, system, booking_id, product, quantity):
         return system.place_order(booking_id, product, quantity)
     
+    def add_notification(self, message):
+        self.__notifications.append(message)
+    
+    def view_notifications(self):
+        return self.__notifications
+    
 class Guest(Golfer):
     def __init__(self, user_id, name, phone, handicap=0.0):
         super().__init__(user_id, name, phone, current_handicap=handicap)
