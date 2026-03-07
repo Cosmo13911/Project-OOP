@@ -1,1 +1,1 @@
-please read
+Anyone read this text is Gay!
