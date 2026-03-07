@@ -5,6 +5,7 @@ from models.booking import Booking, BookingStatus
 from models.order import Order, OrderItem, Product
 from models.tournament import Tournament, TournamentStatus, Prize
 from models.payment import Payment, PaymentType, PaymentStatus
+from models.leaderboard import Leaderboard
 
 class GreenValleySystem:
     def __init__(self):
@@ -60,6 +61,11 @@ class GreenValleySystem:
         self.__courses.append(c1)
         self.__courses.append(c2)
         
+        c1 = Course("C-001","Green Valley Championship", 3500, 72.5, 130)
+        for i in range(1, 19):
+            # ใช้เมธอด add_hole(number, par, stroke_index, distance)
+            # เพื่อความง่ายในการเทสต์ สมมติให้ทุกหลุมเป็นพาร์ 4, ความยาก (stroke_index) เรียงตามเลขหลุม, ระยะ 400 หลา
+            c1.add_hole(i, par=4, stroke_index=i, distance=400)
 # ==========================================
         # 🌟 ระบบสร้าง Slot อัตโนมัติ (Auto-Generate Slots)
         # ==========================================
@@ -101,6 +107,7 @@ class GreenValleySystem:
         c1.slots.append(TeeTimeSlot(f"{tomorrow} 09:00", c1))
         
         # สร้างสมาชิก
+           # M-002
         self.add_member("John Doe", "081-222-3333", Tier.PLATINUM, 12.5)
         self.add_member("Mary Jane", "085-444-5555", Tier.GOLD, 24.0)
 
@@ -112,14 +119,13 @@ class GreenValleySystem:
 
         self.add_member("Phuwadon Meechai", "081-999-0000", Tier.PLATINUM, 13.0)
         self.add_member("Chanita Boonmee", "084-222-1111", Tier.SILVER, 25.0)
-
+        self.add_member("Tiger Woods", "085-999-9999", Tier.GOLD, 0.0)
 
         # 2. เรียกใช้เมธอดเดิมที่มีอยู่แล้ว
         # สั่งให้ John (0) จองสนามแรก (0) เวลาแรก (0)
         self.create_booking(0, 0, 0)
-
-        print(f"System Ready: {len(self.__courses)} Course(s) and {len(self.__users)} Member(s) loaded.")
-        
+        self.create_tournament("Green Valley Open 2026", "2026-12-01", 2500, "C-001")
+        print(f"System Ready: {len(self.__courses)} Course(s) and {len(self.__users)} Member(s) loaded.")        
     def create_booking(self, member_index, course_index, slot_index):
         try:
             member = self.__users[member_index]
@@ -208,20 +214,14 @@ class GreenValleySystem:
     # Tournament Flow (Phase 0, 1, 2)
     # ==========================================
     
-# 🌟 เปลี่ยนให้รับพารามิเตอร์ Dropdown
-    def create_tournament(self, name, date, fee, course_type: CourseType):
-        # 1. ค้นหาสนามที่มี Type ตรงกับที่ Admin เลือกจาก Dropdown
-        selected_course = next((c for c in self.__courses if c.type == course_type), None)
-        if not selected_course:
-            return {"error": f"Course type '{course_type.value}' not found in the system."}
-
-        # 2. สร้างงานแข่ง
+    def create_tournament(self, name, date, fee,course_id):
+        # Phase 0: Create Tournament
         t_id = f"T-{len(self.__tournaments) + 1:03d}"
-        new_tour = Tournament(t_id, name, date, fee)
-        
-        # 3. บันทึกข้อมูลสนามและรางวัล
-        new_tour.set_course(selected_course)
-        
+        course = self.find_course_by_id(course_id)
+        if not course:
+            print(f"❌ Error: ไม่พบสนามแข่งรหัส '{course_id}' ในระบบ")
+            return None
+        new_tour = Tournament(t_id, name, date, fee,course)
         self.__tournaments.append(new_tour)
         return {"tournamentID": t_id, "course_assigned": selected_course.name}
 
@@ -230,7 +230,17 @@ class GreenValleySystem:
             if t.tournamentID == tour_id:
                 return t
         return None
-
+    def find_course_by_id(self, course_id):
+        """ค้นหาสนามจาก ID (C-001) หรือ ชื่อสนาม"""
+        for c in self.__courses:
+            # 1. ตรวจสอบจาก id (ต้องตรงกับที่ใส่ใน Course("C-001", ...))
+            # ใช้ .id เพราะเราทำ @property id ไว้ในคลาส Course แล้ว
+            if hasattr(c, 'id') and c.id == course_id:
+                return c
+            # 2. ตรวจสอบเผื่อคนกรอกเป็นชื่อสนามมาแทน
+            elif c.name == course_id:
+                return c
+        return None
     def register_tournament_get_payment(self, member_id, tour_id):
         tour = self.find_tournament_by_id(tour_id)
         member = self.find_user_by_id(member_id)
@@ -331,7 +341,7 @@ class GreenValleySystem:
                 for member in group:
                     self.create_notification(member, details)
 
-        tour.updateStatus(TournamentStatus.DRAW_PUBLISHED)
+        tour.set_to_deaw_published()
         return f"Draw Published. {len(pairings)} groups assigned."
     
     def ensure_slots_for_date(self, course, date_str):
@@ -351,3 +361,88 @@ class GreenValleySystem:
             current_time += timedelta(minutes=15)
             
         print(f"✅ Generated new slots for {course.name} on {date_str}")
+    def start_tournament(self, tour_id):
+        tour = self.find_tournament_by_id(tour_id)
+        
+        # 1. Validation: ตรวจสอบว่ามีทัวร์นาเมนต์ไหม (Error Handling)
+        if not tour: 
+            return "Error: Tournament not found"
+
+        # 2. Validation: ตรวจสอบสถานะ (Status Tracking)
+        if tour.status != TournamentStatus.DRAW_PUBLISHED:
+            return f"Error: Tournament status is {tour.status.value}. Need DRAW_PUBLISHED."
+
+        if tour.get_date() != date.today():
+            return f"Error: Today is {date.today()}, but tournament is scheduled for {tour.get_date()}"
+
+        # 4. Action: เปลี่ยนสถานะเป็นกำลังแข่ง
+        tour.set_to_in_progress()
+        return f"Success: Tournament {tour_id} is now IN_PROGRESS"
+    def record_tournament_scores(self, tour_id, member_id, scores_dict):
+        # 1. ตรวจสอบข้อมูลพื้นฐาน
+        member = self.find_user_by_id(member_id)
+        tour = self.find_tournament_by_id(tour_id)
+        
+        if not tour: return "Tournament not found"
+        if tour.status != "IN_PROGRESS": return "Tournament is not in progress"
+        if not member: return "Member not found"
+
+        recorded_holes = {} 
+
+        # 2. วนลูปบันทึกคะแนน
+        for current_hole, current_stroke in scores_dict.items():
+            if current_stroke == 0:
+                continue  
+                
+            if current_stroke < 0:
+                return f"คะแนนหลุม {current_hole} ติดลบไม่ได้"
+
+            # 🌟 เรียกใช้เมธอดบันทึกทีละหลุม (สังเกตว่าใช้ tour และ member)
+            success = tour.record_player_score(member, current_hole, current_stroke)
+            
+            if not success:
+                return f"Failed to record score for hole {current_hole}. Invalid hole or player."
+                
+            recorded_holes[current_hole] = current_stroke
+
+        # 3. สรุปผลและส่งค่ากลับ
+        if not recorded_holes:
+            return "No scores recorded. All inputs were 0."
+
+        return {
+            "message": f"Score recorded successfully for {member.name}",
+            "recorded_data": recorded_holes  
+        }
+    def get_tournament_leaderboard(self, tour_id):
+        tour = self.find_tournament_by_id(tour_id)
+        if not tour:
+            return None
+        
+        # 🌟 แก้ไขบรรทัดนี้: ลบขีดล่างออก ใช้ .scorecards.values() ไปเลย
+        scorecards = list(tour.scorecards.values()) 
+        board = Leaderboard(scorecards) 
+        return board.generate()
+
+    def find_course_by_id(self, course_id):
+        # วนลูปหาในลิสต์สนาม
+        for c in self.__courses:
+            # ตรวจสอบ property .id (ต้องตรงกับที่เราทำไว้ใน Class Course)
+            if hasattr(c, 'id') and c.id == course_id:
+                return c
+            # ตรวจสอบเผื่อคนกรอกชื่อสนามมาแทน
+            if c.name == course_id:
+                return c
+        return None
+    def end_tournament(self,tour_id):
+        tour = self.find_tournament_by_id(tour_id)
+        if not tour: 
+            return "Error: Tournament not found"
+
+        if tour.status != TournamentStatus.IN_PROGRESS:
+            return f"Error: Tournament status is {tour.status.value}. IN_PROGRESS"
+        tour.set_to_completed()
+
+        return f"Success: Tournament {tour_id} is now COMPLETED"
+
+
+    
