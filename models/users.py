@@ -1,9 +1,40 @@
 from enum import Enum
 from datetime import datetime, timedelta
 class History:
-    def __init__(self,course,gross_score):
-        self.course=course
-        self.gross_score=gross_score
+    def __init__(self, course, hole_scores, round_type="TOURNAMENT"):
+        """
+        course: ออบเจกต์สนาม (เพื่อให้รู้ว่าแต่ละหลุม พาร์อะไร)
+        hole_scores: Dictionary คะแนน 18 หลุม เช่น {1: 4, 2: 5, ..., 18: 6}
+        """
+        self.course = course
+        self.hole_scores = hole_scores 
+        self.round_type = round_type
+
+        # 1. Gross Score: คะแนนดิบ (ตีจริงเท่าไหร่ รวมเท่านั้น)
+        self.gross_score = sum(hole_scores.values())
+        
+        # 2. Adjusted Score: คะแนนที่ถูกตัดเพดาน Double Par แล้ว (เอาไว้คิด Handicap)
+        self.adjusted_score = self.calculate_adjusted_score()
+
+    def calculate_adjusted_score(self):
+        """ฟังก์ชันคำนวณคะแนน โดยจำกัดเพดานสูงสุดไว้ที่ Double Par ต่อหลุม"""
+        adjusted_total = 0
+        
+        for hole_number, stroke in self.hole_scores.items():
+            # สมมติว่าออบเจกต์ Course ของคุณมีฟังก์ชันหรือดิกชันนารีเก็บค่าพาร์แต่ละหลุม
+            # เช่น course.get_par(1) จะได้ค่า 4
+            hole_par = self.course.get_hole_par(hole_number) 
+            
+            # กฎ Double Par (เช่น พาร์ 4 ตีได้สูงสุดแค่ 8)
+            max_allowed_score = hole_par * 2  
+            
+            # ถ้าตีเกิน Double Par ให้คิดแค่ Double Par
+            if stroke > max_allowed_score:
+                adjusted_total += max_allowed_score
+            else:
+                adjusted_total += stroke
+                
+        return adjusted_total
 class Tier(Enum):
     SILVER = "SILVER"
     GOLD = "GOLD"
@@ -35,24 +66,24 @@ class Golfer(User):
         return self.__history
 
     # 🌟 ฟังก์ชันเสริม: เอาไว้รับคะแนนจาก Scorecard มาใส่ประวัติ
-    def add_history(self, course, gross_score):
-        self.__history.append(History(course, gross_score))
-        self.calculate_handicap() # คำนวณแต้มต่อใหม่ทันทีที่เพิ่มรอบใหม่
+    def add_history(self, course, hole_scores, round_type="TOURNAMENT"):
+        # สร้าง History object ใหม่ด้วยข้อมูลหลุมต่อหลุม
+        new_record = History(course, hole_scores, round_type)
+        self.__history.append(new_record)
+        self.calculate_handicap()
+
     def calculate_handicap(self):
-        # 1. เช็กว่ามีประวัติการเล่นอย่างน้อย 3 รอบหรือไม่
         if len(self.__history) < 3:
             return self.__current_handicap 
 
-        # 2. ดึงประวัติการเล่น "20 รอบล่าสุด"
         recent_history = self.__history[-20:]
         differentials = []
 
-        # 3. คำนวณ Score Differential ของแต่ละรอบ
         for record in recent_history:
-            diff = (record.gross_score - record.course.rating) * (113 / record.course.slope_rating)
+            # 🌟 เปลี่ยนจาก record.gross_score เป็น record.adjusted_score !!
+            # เพื่อให้ Handicap แม่นยำตามมาตรฐาน WHS
+            diff = (record.adjusted_score - record.course.rating) * (113 / record.course.slope_rating)
             differentials.append(diff)
-
-        # 4. เรียงลำดับจากน้อยไปมาก เพื่อหาค่าที่ดีที่สุด (ต่ำที่สุด)
         differentials.sort()
         num_scores = len(differentials)
 

@@ -5,7 +5,6 @@ class TournamentStatus(Enum):
     REGISTRATION_OPEN = "REGISTRATION_OPEN"
     CLOSED = "CLOSED"
     DRAW_PUBLISHED = "DRAW_PUBLISHED"
-    IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
 
 class Tournament:
@@ -23,8 +22,9 @@ class Tournament:
     @property
     def tournamentID(self):
         return self.__tournamentID
-
-    # 🌟 2. เพิ่ม Property พวกนี้เผื่อไว้เลย เพราะระบบต้องใช้ดึงค่าไปคำนวณจ่ายเงินและจัดก๊วนครับ
+    @property
+    def scorecards(self):
+        return self.__scorecards
     @property
     def name(self):
         return self.__name
@@ -58,8 +58,9 @@ class Tournament:
     def set_to_completed(self):
         self.__status = TournamentStatus.COMPLETED
     def addPlayer(self, member):
-        if member not in self.registeredPlayers:
-            self.registeredPlayers.append(member)
+        # 🌟 แก้ไขให้ใช้ self.__registeredPlayers (จัดการตัวแปร Private โดยตรง)
+        if member not in self.__registeredPlayers:
+            self.__registeredPlayers.append(member)
             self.__scorecards[member.user_id] = Scorecard(member, self.course)
             return True
         return False

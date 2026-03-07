@@ -62,7 +62,7 @@ class GreenValleySystem:
         for i in range(1, 19):
             # ใช้เมธอด add_hole(number, par, stroke_index, distance)
             # เพื่อความง่ายในการเทสต์ สมมติให้ทุกหลุมเป็นพาร์ 4, ความยาก (stroke_index) เรียงตามเลขหลุม, ระยะ 400 หลา
-            c1.add_hole(i, par=4, stroke_index=i, distance=400)
+            c1.add_hole(i, par=4)
 # ==========================================
         # 🌟 ระบบสร้าง Slot อัตโนมัติ (Auto-Generate Slots)
         # ==========================================
@@ -319,70 +319,79 @@ class GreenValleySystem:
                 for member in group:
                     self.create_notification(member, details)
 
-        tour.set_to_deaw_published()
+        tour.set_to_draw_published()
         return f"Draw Published. {len(pairings)} groups assigned."
-    def start_tournament(self, tour_id):
+    def record_tournament_score(self, tour_id, member_id, scores_dict):
+        """
+        บันทึกคะแนนสำหรับการแข่ง Tournament (ลง Scorecard ทีละหลุม)
+        """
+        # 1. ตรวจสอบ Member
+        member = self.find_user_by_id(member_id)
+        if not member: 
+            return "Error: Member not found"
+
+        # 2. ตรวจสอบ Tournament
         tour = self.find_tournament_by_id(tour_id)
-        
-        # 1. Validation: ตรวจสอบว่ามีทัวร์นาเมนต์ไหม (Error Handling)
         if not tour: 
             return "Error: Tournament not found"
 
-        # 2. Validation: ตรวจสอบสถานะ (Status Tracking)
+        # 3. ตรวจสอบสถานะ (ต้องเป็น DRAW_PUBLISHED ถึงจะกรอกคะแนนได้)
+        # หมายเหตุ: เราตัด IN_PROGRESS ออกแล้วตามที่คุณสั่งในแชทก่อนหน้า
         if tour.status != TournamentStatus.DRAW_PUBLISHED:
-            return f"Error: Tournament status is {tour.status.value}. Need DRAW_PUBLISHED."
+            return f"Error: Tournament is {tour.status.value}. ต้องเป็น DRAW_PUBLISHED ถึงจะกรอกคะแนนได้"
 
-        if tour.get_date() != date.today():
-            return f"Error: Today is {date.today()}, but tournament is scheduled for {tour.get_date()}"
+        # 4. ตรวจสอบว่าผู้เล่นคนนี้อยู่ในทัวร์นาเมนต์นี้จริงไหม
+        # (สมมติว่าคุณมี dict ชื่อ scorecards เก็บ {member_id: Scorecard_Object})
+        if member_id not in tour.scorecards:
+            return f"Error: {member.name} ไม่ได้ลงทะเบียนหรือยังไม่ได้ถูกจัดกลุ่มในทัวร์นี้"
 
-        # 4. Action: เปลี่ยนสถานะเป็นกำลังแข่ง
-        tour.set_to_in_progress()
-        return f"Success: Tournament {tour_id} is now IN_PROGRESS"
-    def record_tournament_scores(self, tour_id, member_id, scores_dict):
-        # 1. ตรวจสอบข้อมูลพื้นฐาน
-        member = self.find_user_by_id(member_id)
-        tour = self.find_tournament_by_id(tour_id)
+        recorded_count = 0
         
-        if not tour: return "Tournament not found"
-        if tour.status != "IN_PROGRESS": return "Tournament is not in progress"
-        if not member: return "Member not found"
+        # 5. วนลูปบันทึกคะแนนทีละหลุม
+        for hole_str, stroke in scores_dict.items():
+            try:
+                hole_int = int(hole_str)
+                stroke_int = int(stroke)
 
-        recorded_holes = {} 
+                # บันทึกเฉพาะหลุมที่มีคะแนน (> 0)
+                if stroke_int > 0:
+                    # เรียกเมธอดบันทึกคะแนนของ Tournament 
+                    # ซึ่งภายในจะไปเรียก scorecard.record_score(hole, stroke)
+                    tour.record_player_score(member, hole_int, stroke_int)
+                    recorded_count += 1
+            except Exception as e:
+                return f"Error at hole {hole_str}: {str(e)}"
 
-        # 2. วนลูปบันทึกคะแนน
-        for current_hole, current_stroke in scores_dict.items():
-            if current_stroke == 0:
-                continue  
-                
-            if current_stroke < 0:
-                return f"คะแนนหลุม {current_hole} ติดลบไม่ได้"
-
-            # 🌟 เรียกใช้เมธอดบันทึกทีละหลุม (สังเกตว่าใช้ tour และ member)
-            success = tour.record_player_score(member, current_hole, current_stroke)
-            
-            if not success:
-                return f"Failed to record score for hole {current_hole}. Invalid hole or player."
-                
-            recorded_holes[current_hole] = current_stroke
-
-        # 3. สรุปผลและส่งค่ากลับ
-        if not recorded_holes:
-            return "No scores recorded. All inputs were 0."
+        if recorded_count == 0:
+            return "Error: ไม่มีการบันทึกคะแนน (คะแนนต้องมากกว่า 0)"
 
         return {
-            "message": f"Score recorded successfully for {member.name}",
-            "recorded_data": recorded_holes  
+            "status": "Success",
+            "message": f"Recorded {recorded_count} holes for {member.name}",
+            "tournament": tour.name
         }
-    def get_tournament_leaderboard(self, tour_id):
-        tour = self.find_tournament_by_id(tour_id)
-        if not tour:
-            return None
-        
-        # 🌟 แก้ไขบรรทัดนี้: ลบขีดล่างออก ใช้ .scorecards.values() ไปเลย
-        scorecards = list(tour.scorecards.values()) 
-        board = Leaderboard(scorecards) 
-        return board.generate()
+    def record_general_play(self, member_id, course_id, scores_dict):
+        member = self.find_user_by_id(member_id)
+        course = self.find_course_by_id(course_id)
+        if not member or not course: return "Error: Member or Course not found"
 
+        # 🌟 สร้าง Dictionary 1-18 หลุมตามที่ History ต้องการ
+        full_score_record = {}
+        for h in range(1, 19):
+            # ดึงคะแนนจาก input ถ้าไม่มีให้เป็น 0
+            score = scores_dict.get(h) or scores_dict.get(str(h)) or 0
+            full_score_record[h] = score
+
+        # ส่งก้อน Dictionary เข้าไปสร้าง History
+        # (member.add_history จะต้องถูกแก้ให้รับ Dictionary แทน gross_score)
+        member.add_history(course, full_score_record, round_type="GENERAL")
+        
+        return {
+            "status": "Success",
+            "member": member.name,
+            "gross": sum(full_score_record.values()),
+            "details": full_score_record
+        }
     def find_course_by_id(self, course_id):
         # วนลูปหาในลิสต์สนาม
         for c in self.__courses:
@@ -393,16 +402,41 @@ class GreenValleySystem:
             if c.name == course_id:
                 return c
         return None
-    def end_tournament(self,tour_id):
+    def get_tournament_leaderboard(self, tour_id):
+        tour = self.find_tournament_by_id(tour_id)
+        if not tour:
+            return None
+        
+        # 🌟 แก้ไขบรรทัดนี้: ลบขีดล่างออก ใช้ .scorecards.values() ไปเลย
+        scorecards = list(tour.scorecards.values()) 
+        board = Leaderboard(scorecards) 
+        return board.generate()
+    def end_tournament(self, tour_id):
+
         tour = self.find_tournament_by_id(tour_id)
         if not tour: 
             return "Error: Tournament not found"
 
-        if tour.status != TournamentStatus.IN_PROGRESS:
-            return f"Error: Tournament status is {tour.status.value}. IN_PROGRESS"
+        if tour.status != TournamentStatus.DRAW_PUBLISHED:
+            return f"Error: ไม่สามารถจบการแข่งได้ในสถานะ {tour.status.value}"
+
+        updated_players = []
+
+
+        for member_id, sc in tour.scorecards.items():
+            member = self.find_user_by_id(member_id)
+            if member:
+                try:
+                    member.add_history(tour.course, sc.scores, round_type="TOURNAMENT")
+                    updated_players.append(f"{member.name} (New HC: {member.current_handicap})")
+                except Exception as e:
+                    return f"Error updating history for {member.name}: {str(e)}"
+                
         tour.set_to_completed()
 
-        return f"Success: Tournament {tour_id} is now COMPLETED"
-
-
+        return {
+            "status": "Success",
+            "message": f"ปิดการแข่งขัน {tour.name} เรียบร้อยแล้ว",
+            "players_updated": updated_players
+        }
     

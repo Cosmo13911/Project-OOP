@@ -4,16 +4,14 @@ class SlotStatus(Enum):
     AVAILABLE = "AVAILABLE"
     RESERVED = "RESERVED"
 class Hole:
-    def __init__(self, number, par, stroke_index, distance=0):
-        self.__number = number            # เลขหลุม (1-18)
-        self.__par = par                  # พาร์ประจำหลุม (3, 4, หรือ 5)
-        self.__stroke_index = stroke_index # ความยากของหลุม (1-18)
-        self.__distance = distance        # ระยะทาง (หลา/เมตร) - ใส่หรือไม่ใส่ก็ได้
+    def __init__(self, number, par):
+        self.__number = number            
+        self.__par = par 
+
     @property
     def par(self):
         return self.__par
 class Course:
-    # 🌟 1. เอา 'par' ออกจากพารามิเตอร์ของ __init__
     def __init__(self, course_id, name, greenfee, rating, slope_rating):
         if not course_id.startswith("C-"):
             raise ValueError(f"Course ID '{course_id}' ต้องขึ้นต้นด้วย 'C-' เท่านั้น!")
@@ -22,12 +20,14 @@ class Course:
         self.__name = name
         self.__greenfee = greenfee
         self.__slots = []
-        self.__holes = {}  # เก็บเป็น Dictionary {เลขหลุม: Object หลุม}
-        
-        # self.__par = par  <-- 🌟 ลบบรรทัดนี้ทิ้งได้เลย
+        self.__holes = {}
         self.__rating = rating
         self.__slope_rating = slope_rating
-
+    
+    @property
+    def total_holes(self):
+        return len(self.__holes)
+    
     @property
     def id(self):  
         return self.__id
@@ -38,8 +38,6 @@ class Course:
 
     @property
     def par(self):
-        # 🌟 2. ให้มันคำนวณพาร์รวมของสนาม จากพาร์ของทุกหลุมมารวมกัน! (Dynamic Calculation)
-        # ถ้ายังไม่มีหลุมเลย ผลรวมจะเป็น 0 อัตโนมัติ
         return sum(hole.par for hole in self.__holes.values())
 
     @property
@@ -54,9 +52,8 @@ class Course:
     def slots(self):
         return self.__slots
 
-    def add_hole(self, number, par, stroke_index, distance=0):
-        # 🌟 3. สร้าง Object Hole ภายในนี้เลย (Composition) ถูกหลัก OOP สุดๆ
-        self.__holes[number] = Hole(number, par, stroke_index, distance)
+    def add_hole(self, number, par):
+        self.__holes[number] = Hole(number, par)
 
     def get_hole_par(self, number):
         hole = self.__holes.get(number)
