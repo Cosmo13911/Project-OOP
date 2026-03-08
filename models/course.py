@@ -5,8 +5,12 @@ class SlotStatus(Enum):
     RESERVED = "RESERVED"
 class Hole:
     def __init__(self, number, par):
-        self.__number = number            
-        self.__par = par 
+        self.__number = number  # หมายเลขหลุม (1-18)
+        self.__par = par        # พาร์ของหลุมนั้น (เช่น 3, 4, 5)
+
+    @property
+    def number(self):
+        return self.__number
 
     @property
     def par(self):

@@ -1,5 +1,5 @@
-from fastapi import FastAPI, HTTPException # เพิ่ม HTTPException เข้ามา
-from system import GreenValleySystem
+from fastapi import FastAPI, HTTPException,Depends # เพิ่ม HTTPException เข้ามา
+from system import GreenValleySystem,ScoreSubmission
 
 app = FastAPI(
     title="Green Valley Management System", # เปลี่ยนชื่อโปรเจกต์ตรงนี้
@@ -160,59 +160,41 @@ def admin_close_registration_and_pair(tour_id: str = "T-001"):
 @app.post("/admin/record_score/tournament", tags=["Admin"])
 def admin_record_tournament_score(
     tour_id: str = "T-001", 
-    member_id: str = "M-001", 
-    hole1: int = 0, hole2: int = 0, hole3: int = 0, hole4: int = 0, hole5: int = 0, hole6: int = 0,
-    hole7: int = 0, hole8: int = 0, hole9: int = 0, hole10: int = 0, hole11: int = 0, hole12: int = 0,
-    hole13: int = 0, hole14: int = 0, hole15: int = 0, hole16: int = 0, hole17: int = 0, hole18: int = 0
+    member_id: str = "M-001",
+    # 🌟 เติม = Depends() เข้าไปตรงนี้ครับ!
+    scores_obj: ScoreSubmission = Depends() 
 ):
-    scores_input = {
-        1: hole1, 2: hole2, 3: hole3, 4: hole4, 5: hole5, 6: hole6,
-        7: hole7, 8: hole8, 9: hole9, 10: hole10, 11: hole11, 12: hole12,
-        13: hole13, 14: hole14, 15: hole15, 16: hole16, 17: hole17, 18: hole18
-    }
-    # 🌟 เรียกฟังก์ชันสำหรับทัวร์นาเมนต์โดยเฉพาะ
-    result = sys.record_tournament_score(tour_id, member_id, scores_input)
+    # ตรงนี้โค้ดเดิมเป๊ะ! เพราะ scores_obj ยังคงเป็น Object เหมือนเดิม
+    result = sys.record_tournament_score(tour_id, member_id, scores_obj)
     
     if isinstance(result, str) and result.startswith("Error"): 
         raise HTTPException(status_code=400, detail=result)
     return result
 
-# 🌲 สำหรับ General Play: เรียก record_general_play
 @app.post("/admin/record_score/general", tags=["Admin"])
 def admin_record_general_score(
     course_id: str = "C-001", 
-    member_id: str = "M-001", 
-    hole1: int = 0, hole2: int = 0, hole3: int = 0, hole4: int = 0, hole5: int = 0, hole6: int = 0,
-    hole7: int = 0, hole8: int = 0, hole9: int = 0, hole10: int = 0, hole11: int = 0, hole12: int = 0,
-    hole13: int = 0, hole14: int = 0, hole15: int = 0, hole16: int = 0, hole17: int = 0, hole18: int = 0
+    member_id: str = "M-001",
+    # 🌟 เติม = Depends() เข้าไปตรงนี้ด้วยเช่นกัน
+    scores_obj: ScoreSubmission = Depends()
 ):
-    scores_input = {
-        1: hole1, 2: hole2, 3: hole3, 4: hole4, 5: hole5, 6: hole6,
-        7: hole7, 8: hole8, 9: hole9, 10: hole10, 11: hole11, 12: hole12,
-        13: hole13, 14: hole14, 15: hole15, 16: hole16, 17: hole17, 18: hole18
-    }
-    # 🌟 เรียกฟังก์ชันสำหรับการเล่นทั่วไปโดยเฉพาะ
-    result = sys.record_general_play(member_id, course_id, scores_input)
+    result = sys.record_general_play(member_id, course_id, scores_obj)
     
     if isinstance(result, str) and result.startswith("Error"): 
         raise HTTPException(status_code=400, detail=result)
     return result
 @app.get("/admin/tournament/leaderboard", tags=["User", "Admin"])
 def view_tournament_leaderboard(tour_id: str = "T-001"):
-    """User/Admin: ดูตารางผู้นำ (Leaderboard) แบบ Real-time หักลบแต้มต่อ (Handicap) แล้ว"""
-    
+
     try:
+
         result = sys.get_tournament_leaderboard(tour_id)
-        
-        # 2. เช็คว่าหลังบ้านส่ง Error กลับมาไหม
         if isinstance(result, str):
-            # ถ้าเป็นข้อความ (String) แปลว่าหาไม่เจอ
             raise HTTPException(status_code=404, detail=result)
-            
-        # 3. ส่งข้อมูลกลับให้หน้าเว็บสวยๆ
+
         return result
     except Exception as e:
-        # ดักจับ Error เผื่อคลาส Leaderboard ของคุณพังหรือมีปัญหา
+        # ดักจับ Error กะทันหัน เผื่อโค้ดพัง
         raise HTTPException(status_code=500, detail=f"Error generating leaderboard: {str(e)}")
 @app.post("/admin/tournament/end", tags=["Admin"])
 def admin_end_tournament(tour_id: str = "T-001"):

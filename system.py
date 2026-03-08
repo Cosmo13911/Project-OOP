@@ -6,6 +6,8 @@ from models.order import Order, OrderItem, Product
 from models.tournament import Tournament, TournamentStatus
 from models.payment import Payment, PaymentType, PaymentStatus
 from models.leaderboard import Leaderboard
+from models.score import Scorecard
+from models.schemas import ScoreSubmission
 
 class GreenValleySystem:
     def __init__(self):
@@ -123,7 +125,39 @@ class GreenValleySystem:
         # สั่งให้ John (0) จองสนามแรก (0) เวลาแรก (0)
         self.create_booking(0, 0, 0)
         self.create_tournament("Green Valley Open 2026", "2026-12-01", 2500, "C-001")
-        print(f"System Ready: {len(self.__courses)} Course(s) and {len(self.__users)} Member(s) loaded.")        
+        # ==========================================
+        # 🌟 จำลองข้อมูลเพื่อทดสอบการให้คะแนน และ Leaderboard
+        # ==========================================
+        tour = self.find_tournament_by_id("T-001")
+        if tour:
+            print("--- [System] Preparing Mock Leaderboard Data ---")
+            
+            m1 = self.find_user_by_id("M-001") # John Doe
+            m2 = self.find_user_by_id("M-002") # Mary Jane
+            m3 = self.find_user_by_id("M-003") # Arthit
+            
+            tour.addPlayer(m1)
+            tour.addPlayer(m2)
+            tour.addPlayer(m3)
+
+            tour.status = TournamentStatus.DRAW_PUBLISHED
+            
+            
+            # 👉 John (M-001) 
+            score_john = ScoreSubmission(
+                hole1=4, hole2=4, hole3=4, hole4=4, hole5=4, hole6=4, hole7=4, hole8=4, hole9=4,
+                hole10=4, hole11=4, hole12=4, hole13=4, hole14=4, hole15=4, hole16=4, hole17=4, hole18=4
+            )
+            self.record_tournament_score("T-001", "M-001", score_john)
+
+            # 👉 Mary (M-002) 
+            score_mary = ScoreSubmission(
+                hole1=5, hole2=4, hole3=5, hole4=4, hole5=5, hole6=4, hole7=5, hole8=4, hole9=5,
+                hole10=5, hole11=4, hole12=5, hole13=4, hole14=5, hole15=4, hole16=5, hole17=4, hole18=4
+            )
+            self.record_tournament_score("T-001", "M-002", score_mary)
+
+        print(f"System Ready: {len(self.__courses)} Course(s) and {len(self.__users)} Member(s) loaded.")
     def create_booking(self, member_index, course_index, slot_index):
         try:
             member = self.__users[member_index]
@@ -321,76 +355,50 @@ class GreenValleySystem:
 
         tour.set_to_draw_published()
         return f"Draw Published. {len(pairings)} groups assigned."
-    def record_tournament_score(self, tour_id, member_id, scores_dict):
-        """
-        บันทึกคะแนนสำหรับการแข่ง Tournament (ลง Scorecard ทีละหลุม)
-        """
-        # 1. ตรวจสอบ Member
-        member = self.find_user_by_id(member_id)
-        if not member: 
-            return "Error: Member not found"
-
-        # 2. ตรวจสอบ Tournament
+    def record_tournament_score(self, tour_id, member_id, scores_obj):
         tour = self.find_tournament_by_id(tour_id)
-        if not tour: 
-            return "Error: Tournament not found"
+        if not tour:
+            return "Error: ไม่พบทัวร์นาเมนต์นี้"
 
-        # 3. ตรวจสอบสถานะ (ต้องเป็น DRAW_PUBLISHED ถึงจะกรอกคะแนนได้)
-        # หมายเหตุ: เราตัด IN_PROGRESS ออกแล้วตามที่คุณสั่งในแชทก่อนหน้า
-        if tour.status != TournamentStatus.DRAW_PUBLISHED:
-            return f"Error: Tournament is {tour.status.value}. ต้องเป็น DRAW_PUBLISHED ถึงจะกรอกคะแนนได้"
+        # 🌟 จิ้มหา Scorecard จาก member_id ได้เลยตรงๆ! ไม่ต้องวนลูป for
+        scorecard = tour.get_scorecard_by_member_id(member_id) 
+    
+        if not scorecard:
+            return f"Error: ผู้เล่น {member_id} ไม่ได้ลงทะเบียนในทัวร์นาเมนต์นี้"
 
-        # 4. ตรวจสอบว่าผู้เล่นคนนี้อยู่ในทัวร์นาเมนต์นี้จริงไหม
-        # (สมมติว่าคุณมี dict ชื่อ scorecards เก็บ {member_id: Scorecard_Object})
-        if member_id not in tour.scorecards:
-            return f"Error: {member.name} ไม่ได้ลงทะเบียนหรือยังไม่ได้ถูกจัดกลุ่มในทัวร์นี้"
-
-        recorded_count = 0
-        
-        # 5. วนลูปบันทึกคะแนนทีละหลุม
-        for hole_str, stroke in scores_dict.items():
-            try:
-                hole_int = int(hole_str)
-                stroke_int = int(stroke)
-
-                # บันทึกเฉพาะหลุมที่มีคะแนน (> 0)
-                if stroke_int > 0:
-                    # เรียกเมธอดบันทึกคะแนนของ Tournament 
-                    # ซึ่งภายในจะไปเรียก scorecard.record_score(hole, stroke)
-                    tour.record_player_score(member, hole_int, stroke_int)
-                    recorded_count += 1
-            except Exception as e:
-                return f"Error at hole {hole_str}: {str(e)}"
-
-        if recorded_count == 0:
-            return "Error: ไม่มีการบันทึกคะแนน (คะแนนต้องมากกว่า 0)"
-
-        return {
-            "status": "Success",
-            "message": f"Recorded {recorded_count} holes for {member.name}",
-            "tournament": tour.name
-        }
-    def record_general_play(self, member_id, course_id, scores_dict):
+        # วนลูป 18 หลุม เพื่อดึงคะแนนจาก Pydantic Object มาใส่ Scorecard
+        for i in range(1, 19):
+            stroke = scores_obj.get_score(i)
+            if stroke > 0:
+                scorecard.record_score(i, stroke)
+                
+        return "บันทึกคะแนนทัวร์นาเมนต์สำเร็จ!"
+    def record_general_play(self, member_id, course_id, scores_obj):
         member = self.find_user_by_id(member_id)
         course = self.find_course_by_id(course_id)
-        if not member or not course: return "Error: Member or Course not found"
+        if not member or not course: 
+            return "Error: Member or Course not found"
 
-        # 🌟 สร้าง Dictionary 1-18 หลุมตามที่ History ต้องการ
-        full_score_record = {}
+        # 1. สร้าง Instance ของ Scorecard 
+        sc = Scorecard(member, course)
+
+        # 2. วนลูป 1-18 หลุม
         for h in range(1, 19):
-            # ดึงคะแนนจาก input ถ้าไม่มีให้เป็น 0
-            score = scores_dict.get(h) or scores_dict.get(str(h)) or 0
-            full_score_record[h] = score
+            # 🌟 ดึงคะแนนจาก Pydantic Object ด้วยเมธอด get_score ที่เราเพิ่งสร้าง
+            stroke = scores_obj.get_score(h)
 
-        # ส่งก้อน Dictionary เข้าไปสร้าง History
-        # (member.add_history จะต้องถูกแก้ให้รับ Dictionary แทน gross_score)
-        member.add_history(course, full_score_record, round_type="GENERAL")
+            # บันทึกคะแนนลง Scorecard
+            sc.record_score(h, stroke)
+
+        # 3. โยนออบเจกต์ Scorecard เข้าไปให้ Member เก็บ History
+        member.add_history(sc, round_type="GENERAL")
         
+        # คืนค่ากลับไปแสดงผล
         return {
             "status": "Success",
             "member": member.name,
-            "gross": sum(full_score_record.values()),
-            "details": full_score_record
+            "gross": sc.get_gross_score(),       
+            "adjusted": sc.get_adjusted_score()  
         }
     def find_course_by_id(self, course_id):
         # วนลูปหาในลิสต์สนาม
@@ -405,14 +413,13 @@ class GreenValleySystem:
     def get_tournament_leaderboard(self, tour_id):
         tour = self.find_tournament_by_id(tour_id)
         if not tour:
-            return None
+            return "Error: Tournament not found"
         
         # 🌟 แก้ไขบรรทัดนี้: ลบขีดล่างออก ใช้ .scorecards.values() ไปเลย
         scorecards = list(tour.scorecards.values()) 
         board = Leaderboard(scorecards) 
         return board.generate()
     def end_tournament(self, tour_id):
-
         tour = self.find_tournament_by_id(tour_id)
         if not tour: 
             return "Error: Tournament not found"
@@ -422,16 +429,22 @@ class GreenValleySystem:
 
         updated_players = []
 
-
-        for member_id, sc in tour.scorecards.items():
-            member = self.find_user_by_id(member_id)
+        # 🌟 1. เปลี่ยนมาวนลูป List ของออบเจกต์ Scorecard โดยตรง
+        for sc in tour.scorecards:
+            # 🌟 2. ความงดงามของ OOP! เราดึง Member จาก Scorecard ได้เลย ไม่ต้อง find_user_by_id แล้ว
+            member = sc.member 
+            
             if member:
                 try:
-                    member.add_history(tour.course, sc.scores, round_type="TOURNAMENT")
-                    updated_players.append(f"{member.name} (New HC: {member.current_handicap})")
+                    # 🌟 3. ส่งออบเจกต์ Scorecard (sc) เข้าไปตรงๆ ตามที่เราเพิ่งแก้ไว้
+                    # ไม่ต้องส่ง course หรือ sc.scores ที่เป็น Dictionary อีกต่อไป
+                    member.add_history(sc, round_type="TOURNAMENT")
+                    
+                    updated_players.append(f"{member.name} (New HC: {member.current_handicap:.1f})")
                 except Exception as e:
                     return f"Error updating history for {member.name}: {str(e)}"
                 
+        # อัปเดตสถานะทัวร์นาเมนต์เมื่อทุกอย่างเสร็จสิ้น
         tour.set_to_completed()
 
         return {
@@ -439,4 +452,3 @@ class GreenValleySystem:
             "message": f"ปิดการแข่งขัน {tour.name} เรียบร้อยแล้ว",
             "players_updated": updated_players
         }
-    

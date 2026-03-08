@@ -1,40 +1,43 @@
 from enum import Enum
 from datetime import datetime, timedelta
 class History:
-    def __init__(self, course, hole_scores, round_type="TOURNAMENT"):
+    def __init__(self, scorecard_instance, round_type="GENERAL"):
         """
-        course: ออบเจกต์สนาม (เพื่อให้รู้ว่าแต่ละหลุม พาร์อะไร)
-        hole_scores: Dictionary คะแนน 18 หลุม เช่น {1: 4, 2: 5, ..., 18: 6}
+        scorecard_instance: รับเป็นออบเจกต์ Scorecard เลย (เพราะข้างในมี Course และ List ของ ScoreRecord ครบหมดแล้ว)
         """
-        self.course = course
-        self.hole_scores = hole_scores 
-        self.round_type = round_type
+        self.__scorecard = scorecard_instance
+        self.__round_type = round_type
+        self.__date = datetime.now() # เก็บวันที่บันทึกประวัติ
 
-        # 1. Gross Score: คะแนนดิบ (ตีจริงเท่าไหร่ รวมเท่านั้น)
-        self.gross_score = sum(hole_scores.values())
-        
-        # 2. Adjusted Score: คะแนนที่ถูกตัดเพดาน Double Par แล้ว (เอาไว้คิด Handicap)
-        self.adjusted_score = self.calculate_adjusted_score()
+        # 🌟 โค้ดสั้นลงมาก! เพราะเราโยนหน้าที่คำนวณไปให้ Scorecard และ ScoreRecord ทำหมดแล้ว
+        self.__gross_score = self.__scorecard.get_gross_score()
+        self.__adjusted_score = self.__scorecard.get_adjusted_score()
 
-    def calculate_adjusted_score(self):
-        """ฟังก์ชันคำนวณคะแนน โดยจำกัดเพดานสูงสุดไว้ที่ Double Par ต่อหลุม"""
-        adjusted_total = 0
-        
-        for hole_number, stroke in self.hole_scores.items():
-            # สมมติว่าออบเจกต์ Course ของคุณมีฟังก์ชันหรือดิกชันนารีเก็บค่าพาร์แต่ละหลุม
-            # เช่น course.get_par(1) จะได้ค่า 4
-            hole_par = self.course.get_hole_par(hole_number) 
-            
-            # กฎ Double Par (เช่น พาร์ 4 ตีได้สูงสุดแค่ 8)
-            max_allowed_score = hole_par * 2  
-            
-            # ถ้าตีเกิน Double Par ให้คิดแค่ Double Par
-            if stroke > max_allowed_score:
-                adjusted_total += max_allowed_score
-            else:
-                adjusted_total += stroke
-                
-        return adjusted_total
+    # --- Properties ---
+    @property
+    def scorecard(self):
+        return self.__scorecard
+
+    @property
+    def round_type(self):
+        return self.__round_type
+
+    @property
+    def date(self):
+        return self.__date
+
+    @property
+    def gross_score(self):
+        return self.__gross_score
+
+    @property
+    def adjusted_score(self):
+        return self.__adjusted_score
+
+    @property
+    def course(self):
+        # ดึง Course ผ่าน Scorecard ได้เลย
+        return self.__scorecard.course
 class Tier(Enum):
     SILVER = "SILVER"
     GOLD = "GOLD"
@@ -66,11 +69,13 @@ class Golfer(User):
         return self.__history
 
     # 🌟 ฟังก์ชันเสริม: เอาไว้รับคะแนนจาก Scorecard มาใส่ประวัติ
-    def add_history(self, course, hole_scores, round_type="TOURNAMENT"):
-        # สร้าง History object ใหม่ด้วยข้อมูลหลุมต่อหลุม
-        new_record = History(course, hole_scores, round_type)
+    def add_history(self, scorecard_instance, round_type="General"):
+
+        new_record = History(scorecard_instance)
+
         self.__history.append(new_record)
         self.calculate_handicap()
+        print(f"Added {round_type} round to history and updated handicap.")
 
     def calculate_handicap(self):
         if len(self.__history) < 3:
