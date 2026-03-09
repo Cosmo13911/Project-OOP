@@ -1,314 +1,265 @@
-from datetime import datetime, timedelta
-from models.users import Member, Tier, Notification
-from models.course import Course, TeeTimeSlot, SlotStatus, Course1Reserve, CourseType
-from models.booking import Booking, BookingStatus
-from models.order import Order, OrderItem, Product
-from models.tournament import Tournament, TournamentStatus, Prize
-from models.payment import Payment, PaymentType, PaymentStatus
-from models.leaderboard import Leaderboard
-
+from models.users import Member, Guest
+from models.tournament import Tournament
+from models.course import Course
+from models.resources import Product, Order, OrderItem, CartType, Caddy, CaddyLevel
+from models.booking import Booking
+from models.enum import SlotStatus, BookingStatus, TournamentStatus, Tier, CourseType
+from models.notification import Notification
 class GreenValleySystem:
+    MAX_GOLFERS_PER_GROUP = 4
+
     def __init__(self):
         self.__users = []
         self.__courses = []
-        self.__bookings = []
         self.__products = []
-        self.__tournaments = [] # เพิ่มอันนี้
-        self.__payments = []    # เพิ่มอันนี้
+        self.__bookings = []
+        self.__tournaments = []
 
     @property
-    def users(self):
-        return self.__users
-    # แก้ หาวิธีเก็บ obj product ในระบบ
+    def users(self): return self.__users
     @property
-    def bookings(self):
-        return self.__bookings
-    
+    def products(self): return self.__products
     @property
-    def courses(self):
-        return self.__courses
-    
+    def bookings(self): return self.__bookings
     @property
-    def products(self):
-        return self.__products
-
-
-    # ----- เพิ่มโค้ดส่วนนี้ -----
+    def tournaments(self): return self.__tournaments
     @property
-    def tournaments(self):
-        return self.__tournaments
-    # -------------------------
+    def get_all_users(self): return self.__users
+    @property
+    def get_all_courses(self): return self.__courses
+    @property
+    def get_all_products(self): return self.__products
 
-    def add_member(self, name, phone, tier_type, handicap=0.0):
-        new_id = f"M-{len(self.__users) + 1:03d}"
-        new_member = Member(new_id, name, phone, tier_type, handicap)
-        self.__users.append(new_member)
-        return new_member
-
-    def find_user_by_id(self, member_id):
-        # วนลูปหาผู้ใช้ในระบบที่ ID ตรงกับที่กรอกเข้ามา
-        for user in self.__users:
-            if user.user_id == member_id:
-                return user
-        return None # ถ้าวนจนจบแล้วไม่เจอ คืนค่า None (ไม่มีตัวตน)
 
     def create_data(self):
-        print("--- [System] Initializing Modular Data ---")
-        # สร้างสนาม
-        c1 = Course("Green Valley Championship", 3500, CourseType.CHAMPIONSHIP)        
-        c2 = Course("River Executive Course", 2000, CourseType.EXECUTIVE)
-        
-        self.__courses.append(c1)
-        self.__courses.append(c2)
-        
-        c1 = Course("C-001","Green Valley Championship", 3500, 72.5, 130)
-        for i in range(1, 19):
-            # ใช้เมธอด add_hole(number, par, stroke_index, distance)
-            # เพื่อความง่ายในการเทสต์ สมมติให้ทุกหลุมเป็นพาร์ 4, ความยาก (stroke_index) เรียงตามเลขหลุม, ระยะ 400 หลา
-            c1.add_hole(i, par=4, stroke_index=i, distance=400)
-# ==========================================
-        # 🌟 ระบบสร้าง Slot อัตโนมัติ (Auto-Generate Slots)
-        # ==========================================
-        # 1. กำหนดเวลาเริ่ม และ เวลาจบ ของสนาม (เช่น 06:00 ถึง 18:00)
-        start_time = datetime.strptime("2024-12-01 06:00", "%Y-%m-%d %H:%M")
-        end_time = datetime.strptime("2024-12-01 18:00", "%Y-%m-%d %H:%M")
-        
-        current_time = start_time
-        
-        # 2. ให้วนลูปสร้างไปเรื่อยๆ จนกว่าจะถึงเวลาปิดสนาม
-        while current_time <= end_time:
-            # แปลงเวลา datetime กลับเป็น String สวยๆ (เช่น "2024-12-01 06:15")
-            time_str = current_time.strftime("%Y-%m-%d %H:%M")
-            
-            # สร้างสล็อตและยัดเข้าสนาม
-            c1.add_slot(TeeTimeSlot(time_str, c1))
-            c1.slots.append(Course1Reserve(time_str, c1))
-            
-            # 3. บวกเวลาเพิ่มทีละ 15 นาที สำหรับสล็อตถัดไป
-            current_time += timedelta(minutes=15) 
-            
-        print(f"✅ Generated {len(c1.slots)} slots for {c1.name}")
-
-
-        # สร้างสินค้าในร้านอาหาร (Menu)
-        menu_items = [
-            Product("P001", "Fried Rice with Shrimp", 119),
-            Product("P002", "Iced Americano", 69),
-            Product("P003", "Club Sandwich", 77),
-            Product("P004", "Papaya Pokpok", 999),
-            Product("P005", "Mineral Water", 17)
+        # 1. สร้างกลุ่มผู้ใช้ (Actors อย่างน้อย 2 กลุ่ม ตามข้อกำหนด [cite: 24])
+        # ประกอบด้วย Jennie, Praw, Rewthai, Tonkla และคนอื่นๆ รวม 8 คน
+        user_data = [
+            ("M-001", "Jennie", "081-111-1111", Tier.PLATINUM),
+            ("M-002", "Praw", "081-222-2222", Tier.PLATINUM),
+            ("M-003", "Rewthai", "081-333-3333", Tier.PLATINUM),
+            ("M-004", "Tonkla", "081-444-4444", Tier.PLATINUM),
+            ("M-005", "Lisa", "081-555-5555", Tier.GOLD),
+            ("M-006", "Jisoo", "081-666-6666", Tier.SILVER),
+            ("M-007", "Rose", "081-777-7777", Tier.PLATINUM),
+            ("M-008", "BamBam", "081-888-8888", Tier.GOLD)
         ]
 
-        for menu in menu_items:
-            self.__products.append(menu)
+        product_data = [
+            ("P-001", "Papaya PokPok", 109, 20),
+            ("P-002", "Golf Mineral Water", 29, 1000),
+            ("P-003", "Fried Rice", 120, 100),
+            ("P-004", "Iced Americano", 75, 100),
+            ("P-005", "Thai Tea", 55, 100)
+        ]
         
-        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-        c1.slots.append(TeeTimeSlot(f"{tomorrow} 08:00", c1))
-        c1.slots.append(TeeTimeSlot(f"{tomorrow} 09:00", c1))
+        for u_id, name, phone, tier in user_data:
+            # ทุก attribute ใน Member ต้องเป็น private 
+            self.__users.append(Member(u_id, name, phone, tier))
+
+        # 2. สร้างสนามกอล์ฟ 2 สนาม (Entity Class ที่มี ID และจำกัดจำนวน [cite: 10, 11])
+        # สนามที่ 1: Blue Canyon Championship (ยากพิเศษ)
+        c1 = Course("C-001", "Blue Canyon Championship", 3500, 4500, CourseType.CHAMPIONSHIP, rating=99.9, slope_rating=148)
+        # ข้อมูลหลุมแบบคละ Par (ให้ดูสมจริงขึ้น ไม่ใช่ Par 4 ทั้งหมด)
+        # Front Nine (1-9)
+        pars_front = [4, 3, 4, 5, 4, 3, 4, 4, 5] # รวม 36
+        for i, p in enumerate(pars_front, 1): c1.add_hole(i, p)
+        # Back Nine (10-18)
+        pars_back = [4, 5, 3, 4, 4, 3, 4, 5, 4] # รวม 36 (Total 72)
+        for i, p in enumerate(pars_back, 10): c1.add_hole(i, p)
+        self.__courses.append(c1)
+
+        # สนามที่ 2: Executive/Exclusive Course
+        # สนามที่ 2: Laguna Exclusive
+        c2 = Course("C-002", "Laguna Exclusive", 2500, 3200, CourseType.EXECUTIVE, rating=71.2, slope_rating=125)
+
+        # ข้อมูลหลุม (สนาม Executive บางครั้งอาจจะมี Par 3 เยอะกว่าปกติ)
+        pars_front = [2, 3, 4, 5, 4, 3, 4, 4, 5] # รวม 36
+        for i, p in enumerate(pars_front, 1): c2.add_hole(i, p)
+        # Back Nine (10-18)
+        pars_back = [4, 5, 3, 3, 4, 3, 4, 5, 5] # รวม 36 (Total 72)
+        for i, p in enumerate(pars_back, 10): c2.add_hole(i, p)
+        self.__courses.append(c2)
+
+        # สนามที่ 3: Green Valley Resort (ความยากธรรมดา)
+        c3 = Course("C-003", "Ladkrabang Valley", 999, 1190, CourseType.EXECUTIVE, rating=50.7, slope_rating=113)
+
+        # ข้อมูลหลุม (Standard Layout: Par 72)
+        # Front Nine (1-9) - เน้นความง่าย พาร์ 4 เป็นหลัก
+        pars_front_c3 = [2, 2, 3, 4, 3, 3, 2, 3, 1] # รวม 24
+        for i, p in enumerate(pars_front_c3, 1): c3.add_hole(i, p)
         
-        # สร้างสมาชิก
-           # M-002
-        self.add_member("John Doe", "081-222-3333", Tier.PLATINUM, 12.5)
-        self.add_member("Mary Jane", "085-444-5555", Tier.GOLD, 24.0)
-
-        self.add_member("Arthit Chaiyasit", "089-111-2222", Tier.PLATINUM, 9.5)
-        self.add_member("Somsak Prasert", "086-333-4444", Tier.GOLD, 14.0)
-
-        self.add_member("Kanya Wong", "083-555-6666", Tier.PLATINUM, 11.0)
-        self.add_member("Napat Siri", "082-777-8888", Tier.GOLD, 20.5)
-
-        self.add_member("Phuwadon Meechai", "081-999-0000", Tier.PLATINUM, 13.0)
-        self.add_member("Chanita Boonmee", "084-222-1111", Tier.SILVER, 25.0)
-        self.add_member("Tiger Woods", "085-999-9999", Tier.GOLD, 0.0)
-
-        # 2. เรียกใช้เมธอดเดิมที่มีอยู่แล้ว
-        # สั่งให้ John (0) จองสนามแรก (0) เวลาแรก (0)
-        self.create_booking(0, 0, 0)
-        self.create_tournament("Green Valley Open 2026", "2026-12-01", 2500, "C-001")
-        print(f"System Ready: {len(self.__courses)} Course(s) and {len(self.__users)} Member(s) loaded.")        
-    def create_booking(self, member_index, course_index, slot_index):
-        try:
-            member = self.__users[member_index]
-            slot = self.__courses[course_index].slots[slot_index]
-
-            if slot.status == SlotStatus.AVAILABLE:
-                b_id = f"BK-{len(self.__bookings) + 1:03d}"
-                new_booking = Booking(b_id, member, slot)
-                slot.status = SlotStatus.RESERVED
-                self.__bookings.append(new_booking)
-                print(f"Success: Booking {b_id} for {member.name}")
-                return new_booking
-            else:
-                print("Error: Slot already reserved.")
-                return None
-        except IndexError:
-            print("Error: Data index out of range.")
-            return None
+        # Back Nine (10-18)
+        pars_back_c3 = [2, 3, 3, 1, 2, 3, 3, 5, 5] # รวม 36 (Total 60)
+        for i, p in enumerate(pars_back_c3, 10): c3.add_hole(i, p)
         
-    def find_booking_by_id(self, booking_id):
-        for b in self.__bookings:
-            if b.booking_id == booking_id:
-                return b
-        return None
+        self.__courses.append(c3)
+
+        # 3. สร้างข้อมูลสินค้า/บริการ (เพื่อให้ครบองค์ประกอบค่าใช้จ่าย 4 รายการ )
+        # สินค้าเหล่านี้ต้องมี ID และระบุจำนวนที่เหลือได้ 
+        for p_id, name, price, stock in product_data:
+            self.__products.append(Product(p_id, name, price, stock))
+
+        # 4. จำลองการจอง (Transaction Class [cite: 8])
+        # ต้องมีสถานะติดตาม (PENDING, CONFIRMED, CANCELLED) อย่างน้อย 3 สถานะ [cite: 12]
+
+    def find_user(self, user_id: str):
+        for user in self.__users:
+            if user.id == user_id:
+                return user
+        raise ValueError(f"User with ID {user_id} not found")
+
+    def find_course(self, course_id: str):
+        for course in self.__courses:
+            if course.id == course_id:
+                return course
+        raise ValueError(f"Course with ID {course_id} not found")
+
+    def find_tournament(self, tour_id: str):
+        for tour in self.__tournaments:
+            if tour.id == tour_id:
+                return tour
+        raise ValueError(f"Tournament with ID {tour_id} not found")
     
-    def find_user_by_id(self, user_id):
-        for u in self.__users:
-            if u.user_id == user_id:
-                return u
-        return None
-    
-    # ------------------- order ----------------------- #
-    def create_order(self, product_list, requester):
-        order = Order()
+    def find_booking(self, booking_id: str):
+        for booking in self.__bookings:
+            if booking.booking_id == booking_id:
+                return booking
+        raise ValueError(f"Booking with ID {booking_id} not found")
 
-        for i in range(0, len(product_list[0].split(',')), 2):
-            product_id = product_list[0].split(',')[i]
-            quantity = int(product_list[0].split(',')[i+1])
+    def find_product(self, product_id: str):
+        for product in self.__products:
+            if product.id == product_id:
+                return product
+        raise ValueError(f"Product with ID {product_id} not found")
 
-            product = self.find_product_by_id(product_id)
-            if not product:
-                return {"error": "Product not found."}
+    def create_booking(self, requester_id: str, course_id: str, date: str, time: str, companion_ids: list = None):
+        if companion_ids is None:
+            companion_ids = []
             
-            item = self.create_item(product, quantity)
-            order.add_item(item)
-            self.create_notification(requester, f"Your order for {quantity} x {product.name} has been placed successfully.")
+        # 1. Validation: ตรวจสอบจำนวนคนในก๊วน (รวมคนจองต้องไม่เกิน 4)
+        total_golfers = 1 + len(companion_ids)
+        if total_golfers > self.MAX_GOLFERS_PER_GROUP:
+            raise ValueError(f"1 Group can have at most {self.MAX_GOLFERS_PER_GROUP} golfers (including requester). You have {total_golfers}.")
 
-        return order
-
-    def create_item(self, product, quantity):
-        item = OrderItem(product, quantity)
-        return item
-    
-    def place_order(self, booking_id, product_list):
-        print(f"[System] Placing order for Booking ID: {booking_id} ")
-
-        booking = self.find_booking_by_id(booking_id)
-        if not booking:
-            return "Error: You have to booking first."
-
-        order = self.create_order(product_list, booking.requester)
-        order.calculate_total()
-
-        booking.add_order(order)
-
-        return "Order placed successfully."
-    
-    def find_product_by_id(self, product_id):
-        for p in self.__products:
-            if p.id == product_id:
-                return p
-        return None
-    
-# -------------- notification ------------------ #
-# ในคลาส GreenValleySystem (ไฟล์ system.py)
-    def create_notification(self, member, details):
-        # 1. สร้างอ็อบเจกต์ Notification ขึ้นมา
-        # new_noti = Notification(
-        #     title="แจ้งเตือนเวลาออกรอบ (Tee Time)", 
-        #     message=details
-        # )
-        
-        # 2. ส่งอ็อบเจกต์นี้เข้าไปเก็บในตัว Member
-        member.add_notification(details)
-    # ==========================================
-    # Tournament Flow (Phase 0, 1, 2)
-    # ==========================================
-    
-    def create_tournament(self, name, date, fee,course_id):
-        # Phase 0: Create Tournament
-        t_id = f"T-{len(self.__tournaments) + 1:03d}"
-        course = self.find_course_by_id(course_id)
+        requester = self.find_user(requester_id)
+        if not requester:
+            raise ValueError(f"Requester with ID {requester_id} not found")
+        course = self.find_course(course_id)
         if not course:
-            print(f"❌ Error: ไม่พบสนามแข่งรหัส '{course_id}' ในระบบ")
-            return None
-        new_tour = Tournament(t_id, name, date, fee,course)
+            raise ValueError(f"Course with ID {course_id} not found")
+        # 2. ค้นหาสมาชิกคนอื่นๆ ในก๊วน
+        companions = []
+        for c_id in companion_ids:
+            comp = self.find_user(c_id)
+            if comp:
+                if comp == requester:
+                    raise ValueError("Requester cannot be a companion to themselves.")
+                companions.append(comp)
+            else: raise ValueError(f"Companion with ID {c_id} not found")
+
+        # 3. ค้นหาและตรวจสอบ Slot
+        slot = course.find_slot(date, time)
+        if not slot or slot.status != SlotStatus.AVAILABLE:
+            raise ValueError(f"Slot {time} on {date} is not available for course {course.name}")
+
+        # 4. สร้างการจองและล็อก Slot ทันที (Locking Logic)
+        b_id = f"BK-{len(self.__bookings) + 1:03d}"
+        new_booking = Booking(b_id, requester, slot)
+        
+        # เพิ่มเพื่อนร่วมก๊วนเข้าไปใน Booking Object
+        # (ตรวจสอบว่าในคลาส Booking มี Method add_golfers หรือยัง)
+        new_booking.add_golfer(companions)
+
+        # 5. เปลี่ยนสถานะ Slot เป็น RESERVED ทันทีเพื่อล็อกก๊วน
+        # ตามเกณฑ์ข้อ 1.15 การเปลี่ยนสถานะถือเป็นการติดตามสถานะทรัพยากร
+        slot.status = SlotStatus.RESERVED 
+
+        # 6. แจ้งเตือนทุกคนในก๊วน (Notification - ข้อ 1.20)
+        all_players = [requester] + companions
+        for player in all_players:
+            player.add_notification(Notification(f"Booking id: {b_id}, Course {course.name}, Slot time : {slot.time}"))
+
+        self.__bookings.append(new_booking)
+        return new_booking
+
+    # ---------------- Ordering ----------------
+    def place_order(self, booking_id: str, product_id: str, quantity: int):
+    
+        if quantity <= 0:
+            raise ValueError("Quantity must be greater than zero")
+
+        booking = self.find_booking(booking_id)
+        if not booking:
+            raise KeyError(f"Booking ID {booking_id} not found")
+
+        product = self.find_product(product_id)
+        if not product:
+            raise KeyError(f"Product ID {product_id} not found")
+
+        if not product.check_stock(quantity):
+            raise ValueError(f"Not enough stock. Remaining: {product.stock}")
+        
+        product.reduce_stock(quantity) 
+
+        order_id = f"ORD-{len(booking.orders)+1:03d}"
+        new_order = Order(order_id, booking.requester)
+        new_order.add_item(OrderItem(product, quantity))
+        
+        booking.add_order(new_order)
+        net_total = new_order.calculate_net_total
+
+        if isinstance(booking.requester, Member):
+            booking.requester.add_notification(Notification(f"Order placed: {quantity}x {product.name}. Total: {net_total} THB)"))
+
+        return f"Order placed successfully. Total: {net_total} THB"
+
+    # ---------------- Tournament ----------------
+    def create_tournament(self, name: str, date: str, fee: float, course_id: str):
+        course = self.find_course(course_id)
+        if not course:
+            raise ValueError(f"Course with ID {course_id} not found")
+                    
+        t_id = f"T-{len(self.__tournaments) + 1:03d}"
+        new_tour = Tournament(t_id, name, date, fee, course)
         self.__tournaments.append(new_tour)
-        return {"tournamentID": t_id, "course_assigned": selected_course.name}
+        return {"tournamentID": t_id, "course_assigned": course.name}
 
-    def find_tournament_by_id(self, tour_id):
-        for t in self.__tournaments:
-            if t.tournamentID == tour_id:
-                return t
-        return None
-    def find_course_by_id(self, course_id):
-        """ค้นหาสนามจาก ID (C-001) หรือ ชื่อสนาม"""
-        for c in self.__courses:
-            # 1. ตรวจสอบจาก id (ต้องตรงกับที่ใส่ใน Course("C-001", ...))
-            # ใช้ .id เพราะเราทำ @property id ไว้ในคลาส Course แล้ว
-            if hasattr(c, 'id') and c.id == course_id:
-                return c
-            # 2. ตรวจสอบเผื่อคนกรอกเป็นชื่อสนามมาแทน
-            elif c.name == course_id:
-                return c
-        return None
-    def register_tournament_get_payment(self, member_id, tour_id):
-        tour = self.find_tournament_by_id(tour_id)
-        member = self.find_user_by_id(member_id)
+    def register_tournament_get_payment(self, member_id: str, tour_id: str):
+        tour = self.find_tournament(tour_id)
+        if not tour: raise ValueError(f"Tournament with ID {tour_id} not found")
+
+        member = self.find_user(member_id)
+        if not member: raise ValueError(f"Member with ID {member_id} not found")
         
-        # ❌ ป้องกันที่ 1: ตรวจสอบว่ามีงานแข่งนี้ และ "มีผู้ใช้คนนี้ในระบบจริงๆ"
-        if not tour:
-            return {"error": "Tournament not found in the system."}
-        if not member:
-            return {"error": f"Invalid Member ID: '{member_id}' does not exist!"} # เตะกลับทันทีถ้า ID มั่ว
-        # ❌ ป้องกันที่ 1: เช็คว่าคนนี้จ่ายเงินและอยู่ในรายชื่อแข่งไปแล้วหรือยัง
-        if member in tour.registeredPlayers:
-            return {"error": f"Member {member.name} is already registered for this tournament!"}
+        if any(entry.player.user_id == member.user_id for entry in tour.registered_players):
+            raise ValueError("Already registered.")
+
+        p_id = f"PAY-{member_id}-{tour_id}"
+        return {"paymentID": p_id, "amount": tour.entry_fee, "message": "Proceed to payment"}
+
+    def process_payment(self, payment_id: str):
+        # จำลองการจ่ายเงินผ่าน
+        parts = payment_id.split("-")
+        if len(parts) == 3:
+            member_id = f"{parts[1]}-{parts[2]}" # M-001 -> PAY-M-001-T-001 -> len is 4. Let's fix.
+            member_id = parts[1] + "-" + parts[2]
+            tour_id = parts[3] + "-" + parts[4] if len(parts)==5 else parts[-2]+"-"+parts[-1]
             
-        # ❌ ป้องกันที่ 2: เช็คว่าเคยกดสมัครแล้วบิลยังค้างจ่ายอยู่ไหม (กันกดเบิ้ลเอาบิลใหม่)
-        for p in self.__payments:
-            if p.member == member and p.tournamentID == tour_id and p.status == PaymentStatus.PENDING:
-                return {"error": f"You already have a pending payment ({p.paymentID}) for this tournament."}
-        
-        # ถ้าผ่านด่านเช็คด้านบนมาได้ ค่อยออกบิลให้ใหม่ครับ
-        p_id = f"PAY-{len(self.__payments) + 1:03d}"
-        new_payment = Payment(p_id, tour.entryFee, PaymentType.TOURNAMENT_FEE, member, tour_id)
-        self.__payments.append(new_payment)
-        
-        return {"paymentID": p_id, "amount": tour.entryFee, "message": "Here is your Invoice/Payment QR"}
+        tour = self.find_tournament(tour_id)
+        if not tour: raise ValueError("Tournament not found.")
 
+        member = self.find_user(member_id)
+        if not member: raise ValueError("Member not found.")
 
-    def process_payment(self, payment_id):
-        # Phase 1: validate & addPlayer
-        payment = next((p for p in self.__payments if p.paymentID == payment_id), None)
-        if not payment: 
-            return {"error": "Payment not found"}
+        if tour.add_player(member):
+            return {"status": "SUCCESS", "message": "Confirmed"}
 
-        if payment.validate() == PaymentStatus.SUCCESS:
-            tour = self.find_tournament_by_id(payment.tournamentID)
-            tour.addPlayer(payment.member)
-            return {"status": "SUCCESS", "message": "Registration & Payment Confirmed"}
-        
-        return {"status": "FAILED"}
-
-    def get_tournament_players(self, tour_id):
-        # ค้นหา Tournament จาก ID
-        tour = self.find_tournament_by_id(tour_id)
-        if not tour:
-            return {"error": "Tournament not found in the system."}
-            
-        # ดึงข้อมูลผู้เล่นที่อยู่ในลิสต์ registeredPlayers
-        player_list = []
-        for player in tour.registeredPlayers:
-            player_list.append({
-                "member_id": player.user_id,
-                "name": player.name,
-                "tier": player.tier.value if hasattr(player, 'tier') else "N/A",
-                "handicap": player.current_handicap
-            })
-            
-        # ส่งข้อมูลสรุปกลับไป
-        return {
-            "tournament_id": tour.tournamentID,
-            "tournament_name": tour.name,
-            "status": tour.status.value,
-            "total_registered": len(tour.registeredPlayers),
-            "players": player_list
-        }
 
     def close_registration_and_pairing(self, tour_id):
         # Phase 2: Closing & Mass Booking
         tour = self.find_tournament_by_id(tour_id)
-        if not tour: return "Tournament not found"
+        if not tour: raise ValueError("Tournament not found.")
 
         tour.updateStatus(TournamentStatus.CLOSED)
         pairings = tour.generatePairing()
@@ -323,126 +274,80 @@ class GreenValleySystem:
         # Loop Every 4 Players
         for group in pairings:
             # 🌟 3. หาสล็อตว่าง "เฉพาะของวันที่จัดแข่งเท่านั้น" (กันพลาดไปดึงของวันอื่น)
-            available_slot = next((s for s in course.slots if s.status == SlotStatus.AVAILABLE and s.play_date.startswith(target_date)), None)
+            for slot in course.slots:
+                if slot.status == SlotStatus.AVAILABLE and slot.play_date.startswith(target_date):
+                    available_slot = slot
+                    return available_slot
+            raise ValueError(f"No available slots on {target_date} for course {course.name}")
             
-            if available_slot:
-                b_id = f"BK-{len(self.__bookings) + 1:03d}"
-                new_booking = Booking(b_id, group[0], available_slot) # คนแรกเป็น Requester
-                new_booking.update_status(BookingStatus.CONFIRMED_PAID)
-                new_booking.add_golfers(group[1:]) # ยัดคนที่เหลือเข้าก๊วน
-                
-                # เปลี่ยนสถานะเป็น RESERVED เพื่อไม่ให้ก๊วนอื่นมาแย่ง (ป้องกันคิวชน)
-                available_slot.update_status(SlotStatus.RESERVED)
-                self.__bookings.append(new_booking)
-                tour.add_match_booking(new_booking)
+            b_id = f"BK-{len(self.__bookings) + 1:03d}"
+            new_booking = Booking(b_id, group[0], available_slot) # คนแรกเป็น Requester
+            new_booking.update_status(BookingStatus.CONFIRMED_PAID)
+            new_booking.add_golfers(group[1:]) # ยัดคนที่เหลือเข้าก๊วน
+            
+            # เปลี่ยนสถานะเป็น RESERVED เพื่อไม่ให้ก๊วนอื่นมาแย่ง (ป้องกันคิวชน)
+            available_slot.update_status(SlotStatus.RESERVED)
+            self.__bookings.append(new_booking)
+            tour.add_match_booking(new_booking)
 
-                # แจ้งเตือน Notification ตอนนี้จะเป็นเวลาและวันที่ที่ถูกต้องแล้ว
-                details = f"Tee Time Assigned: {available_slot.play_date} for Tournament: {tour.name}"
-                for member in group:
-                    self.create_notification(member, details)
+            # แจ้งเตือน Notification ตอนนี้จะเป็นเวลาและวันที่ที่ถูกต้องแล้ว
+            details = f"Tee Time Assigned: {available_slot.play_date} for Tournament: {tour.name}"
+            
+            for member in group:
+                self.create_notification(member, details)
 
-        tour.set_to_deaw_published()
+        tour.updateStatus(TournamentStatus.DRAW_PUBLISHED)
         return f"Draw Published. {len(pairings)} groups assigned."
     
-    def ensure_slots_for_date(self, course, date_str):
-        # 1. เช็คว่าสนามนี้ ในวันที่กำหนด (date_str) มีการสร้าง Slot ไว้หรือยัง
-        existing_slots = [s for s in course.slots if s.play_date.startswith(date_str)]
-        if existing_slots:
-            return  # ถ้ามีแล้ว ไม่ต้องสร้างใหม่ ให้ใช้ของเดิมที่มีอยู่ (เพื่อจะได้เช็คคิวชนได้)
-
-        # 2. ถ้ายังไม่มี ให้สร้างใหม่ตั้งแต่ 06:00 - 18:00 ตามวันที่กรอกเข้ามา
-        start_time = datetime.strptime(f"{date_str} 06:00", "%Y-%m-%d %H:%M")
-        end_time = datetime.strptime(f"{date_str} 18:00", "%Y-%m-%d %H:%M")
-        current_time = start_time
-        
-        while current_time <= end_time:
-            time_str = current_time.strftime("%Y-%m-%d %H:%M")
-            course.slots.append(TeeTimeSlot(time_str, course))
-            current_time += timedelta(minutes=15)
-            
-        print(f"✅ Generated new slots for {course.name} on {date_str}")
-    def start_tournament(self, tour_id):
-        tour = self.find_tournament_by_id(tour_id)
-        
-        # 1. Validation: ตรวจสอบว่ามีทัวร์นาเมนต์ไหม (Error Handling)
+    def record_tournament_score(self, tour_id: str, member_id: str, hole_number: int, stroke: int):
+        tour = self.find_tournament(tour_id)
         if not tour: 
-            return "Error: Tournament not found"
+            raise ValueError("Tournament not found")
+        if tour.status.value != "IN_PROGRESS": 
+            raise ValueError("Tournament is not in progress")
 
-        # 2. Validation: ตรวจสอบสถานะ (Status Tracking)
-        if tour.status != TournamentStatus.DRAW_PUBLISHED:
-            return f"Error: Tournament status is {tour.status.value}. Need DRAW_PUBLISHED."
-
-        if tour.get_date() != date.today():
-            return f"Error: Today is {date.today()}, but tournament is scheduled for {tour.get_date()}"
-
-        # 4. Action: เปลี่ยนสถานะเป็นกำลังแข่ง
-        tour.set_to_in_progress()
-        return f"Success: Tournament {tour_id} is now IN_PROGRESS"
-    def record_tournament_scores(self, tour_id, member_id, scores_dict):
-        # 1. ตรวจสอบข้อมูลพื้นฐาน
-        member = self.find_user_by_id(member_id)
-        tour = self.find_tournament_by_id(tour_id)
+        success = tour.record_score(member_id, hole_number, stroke)
+        if not success: 
+            raise ValueError("Failed to record score. Check member ID, hole number, or stroke value.")
         
-        if not tour: return "Tournament not found"
-        if tour.status != "IN_PROGRESS": return "Tournament is not in progress"
-        if not member: return "Member not found"
+        return {"message": f"Score recorded for {member_id}: Hole {hole_number} = {stroke}"}
 
-        recorded_holes = {} 
-
-        # 2. วนลูปบันทึกคะแนน
-        for current_hole, current_stroke in scores_dict.items():
-            if current_stroke == 0:
-                continue  
-                
-            if current_stroke < 0:
-                return f"คะแนนหลุม {current_hole} ติดลบไม่ได้"
-
-            # 🌟 เรียกใช้เมธอดบันทึกทีละหลุม (สังเกตว่าใช้ tour และ member)
-            success = tour.record_player_score(member, current_hole, current_stroke)
-            
-            if not success:
-                return f"Failed to record score for hole {current_hole}. Invalid hole or player."
-                
-            recorded_holes[current_hole] = current_stroke
-
-        # 3. สรุปผลและส่งค่ากลับ
-        if not recorded_holes:
-            return "No scores recorded. All inputs were 0."
-
-        return {
-            "message": f"Score recorded successfully for {member.name}",
-            "recorded_data": recorded_holes  
-        }
-    def get_tournament_leaderboard(self, tour_id):
-        tour = self.find_tournament_by_id(tour_id)
+    def get_tournament_leaderboard(self, tour_id: str):
+        tour = self.find_tournament(tour_id)
         if not tour:
-            return None
+            raise ValueError("Tournament not found")
         
-        # 🌟 แก้ไขบรรทัดนี้: ลบขีดล่างออก ใช้ .scorecards.values() ไปเลย
-        scorecards = list(tour.scorecards.values()) 
-        board = Leaderboard(scorecards) 
-        return board.generate()
-
-    def find_course_by_id(self, course_id):
-        # วนลูปหาในลิสต์สนาม
-        for c in self.__courses:
-            # ตรวจสอบ property .id (ต้องตรงกับที่เราทำไว้ใน Class Course)
-            if hasattr(c, 'id') and c.id == course_id:
-                return c
-            # ตรวจสอบเผื่อคนกรอกชื่อสนามมาแทน
-            if c.name == course_id:
-                return c
-        return None
-    def end_tournament(self,tour_id):
-        tour = self.find_tournament_by_id(tour_id)
+        return {
+            "tournament_name": tour.name,
+            "status": tour.status.value,
+            "leaderboard": tour.get_leaderboard()
+        }
+    
+    def end_tournament(self, tour_id):
+        tour = self.find_tournament(tour_id)
         if not tour: 
-            return "Error: Tournament not found"
+            raise ValueError("Tournament not found")
 
-        if tour.status != TournamentStatus.IN_PROGRESS:
-            return f"Error: Tournament status is {tour.status.value}. IN_PROGRESS"
+        if tour.status != TournamentStatus.DRAW_PUBLISHED:
+            raise ValueError(f"Error: ไม่สามารถจบการแข่งได้ในสถานะ {tour.status.value}")
+
+        updated_players = []
+
+        # 🌟 1. เปลี่ยนมาวนลูป List ของออบเจกต์ Scorecard โดยตรง
+        for sc in tour.scorecards:
+            # 🌟 2. ความงดงามของ OOP! เราดึง Member จาก Scorecard ได้เลย ไม่ต้อง find_user_by_id แล้ว
+            member = sc.member 
+            if not member:
+                raise ValueError(f"Member not found for Scorecard with member ID {sc.member.user_id}")
+                
+            member.add_history(sc, round_type="TOURNAMENT") 
+            updated_players.append(f"{member.name} (New HC:{member.current_handicap:.1f})")
+                
+        # อัปเดตสถานะทัวร์นาเมนต์เมื่อทุกอย่างเสร็จสิ้น
         tour.set_to_completed()
 
-        return f"Success: Tournament {tour_id} is now COMPLETED"
-
-
-    
+        return {
+            "status": "Success",
+            "message": f"ปิดการแข่งขัน {tour.name} เรียบร้อยแล้ว",
+            "players_updated": updated_players
+        }

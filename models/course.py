@@ -1,62 +1,90 @@
-from enum import Enum
-
-class SlotStatus(Enum):
-    AVAILABLE = "AVAILABLE"
-    RESERVED = "RESERVED"
+from models.enum import SlotStatus
 class Hole:
-    def __init__(self, number, par, stroke_index, distance=0):
-        self.__number = number            # เลขหลุม (1-18)
-        self.__par = par                  # พาร์ประจำหลุม (3, 4, หรือ 5)
-        self.__stroke_index = stroke_index # ความยากของหลุม (1-18)
-        self.__distance = distance        # ระยะทาง (หลา/เมตร) - ใส่หรือไม่ใส่ก็ได้
+    def __init__(self, number: int, par: int):
+        self.__number = number
+        self.__par = par
+
     @property
     def par(self):
         return self.__par
+    
+    def get_hole_par(self, number):
+        hole = self.__holes.get(number)
+        if hole:
+            return hole.par
+        raise ValueError(f"ไม่พบข้อมูลหลุมที่ {number} ในสนามนี้") # 🌟 ดัก Error ให้ชัดเจนขึ้นแทนการ return 0
+
+    def get_hole_info(self, number):
+        return self.__holes.get(number)
+
 class Course:
-    # 🌟 1. เอา 'par' ออกจากพารามิเตอร์ของ __init__
-    def __init__(self, course_id, name, greenfee, rating, slope_rating):
-        if not course_id.startswith("C-"):
-            raise ValueError(f"Course ID '{course_id}' ต้องขึ้นต้นด้วย 'C-' เท่านั้น!")
-            
+    def __init__(self, course_id, name, fee_morning, fee_afternoon, course_type, rating, slope_rating, open_time="06:00", close_time="18:00"):
         self.__id = course_id
         self.__name = name
-        self.__greenfee = greenfee
-        self.__slots = []
-        self.__holes = {}  # เก็บเป็น Dictionary {เลขหลุม: Object หลุม}
-        
-        # self.__par = par  <-- 🌟 ลบบรรทัดนี้ทิ้งได้เลย
+        self.__fee_morning = fee_morning
+        self.__fee_afternoon = fee_afternoon
+        self.__type = course_type
         self.__rating = rating
-        self.__slope_rating = slope_rating
+        self.__slope_rating = slope_rating  
+        self.__open_time = open_time
+        self.__close_time = close_time
+        self.__operating_hours = [f"{h:02d}:{m:02d}" for h in range(6, 18) for m in (0, 15, 30, 45)]
+        self.__slots = []  
+        self.__holes = []
 
     @property
-    def id(self):  
-        return self.__id
-
+    def id(self): return self.__id
     @property
-    def name(self):
-        return self.__name
-
+    def name(self): return self.__name
     @property
-    def par(self):
-        # 🌟 2. ให้มันคำนวณพาร์รวมของสนาม จากพาร์ของทุกหลุมมารวมกัน! (Dynamic Calculation)
-        # ถ้ายังไม่มีหลุมเลย ผลรวมจะเป็น 0 อัตโนมัติ
-        return sum(hole.par for hole in self.__holes.values())
-
+    def fee_morning(self): return self.__fee_morning
     @property
-    def rating(self):
-        return self.__rating
-
+    def fee_afternoon(self): return self.__fee_afternoon
     @property
-    def slope_rating(self):
-        return self.__slope_rating
-
+    def type(self): return self.__type
     @property
-    def slots(self):
-        return self.__slots
+    def operating_hours(self): return self.__operating_hours
+    @property
+    def par(self): return sum(hole.par for hole in self.__holes)
+    @property
+    def slots(self): return self.__slots
+    @property
+    def rating(self): return self.__rating
+    @property
+    def slope_rating(self): return self.__slope_rating
+    @property
+    def get_difficulty(self):
+        if self.__slope_rating > 140: return "Very Hard (Championship Level)"
+        elif self.__slope_rating > 120: return "Challenging"
+        return "Normal"
+    
+    def get_price_by_time(self, time_str: str):
+        hour = int(time_str.split(":")[0])
+        return self.__fee_morning if hour < 12 else self.__fee_afternoon
+    
+    def generate_slots_for_date(self, date: str):
+        if any(s.play_date == date for s in self.__slots):
+            return
+        for time_str in self.__operating_hours:
+            new_slot = Course1Reserve(date, time_str, self)
+            self.__slots.append(new_slot)
 
-    def add_hole(self, number, par, stroke_index, distance=0):
-        # 🌟 3. สร้าง Object Hole ภายในนี้เลย (Composition) ถูกหลัก OOP สุดๆ
-        self.__holes[number] = Hole(number, par, stroke_index, distance)
+    def get_available_slots(self, date: str):
+        self.generate_slots_for_date(date)
+        return [s for s in self.__slots if s.play_date == date and s.status == SlotStatus.AVAILABLE]
+
+    def find_slot(self, date: str, time: str):
+        self.generate_slots_for_date(date)
+        for s in self.__slots:
+            if s.play_date == date and s.time == time:
+                return s
+        return None
+    
+    def add_hole(self, number: int, par: int):
+        # สร้าง Object Hole ภายในคลาส (Composition)
+        if len(self.__holes) < 18:
+            new_hole = Hole(number, par)
+            self.__holes.append(new_hole)
 
     def get_hole_par(self, number):
         hole = self.__holes.get(number)
@@ -66,30 +94,33 @@ class Course:
 
     def get_hole_info(self, number):
         return self.__holes.get(number)
+
+
 class TeeTimeSlot:
-    def __init__(self, play_date, course):
+    def __init__(self, play_date, time, course):
+        # ทุก attribute เป็น private ทั้งหมด 
         self.__play_date = play_date
+        self.__time = time
         self.__course = course
-        self.__status = SlotStatus.AVAILABLE
+        # มีสถานะติดตามอย่างน้อย 3 สถานะ 
+        self.__status = SlotStatus.AVAILABLE 
+
     @property
-    def status(self):
-        return self.__status
-        
-    # 🌟 2. Setter: เปิดให้แก้ไขค่า status ได้ (ตอนจองจะได้เปลี่ยนเป็น RESERVED)
+    def play_date(self): return self.__play_date
+    @property
+    def time(self): return self.__time
+    @property
+    def status(self): return self.__status
+
     @status.setter
-    def status(self, new_status):
+    def status(self, new_status): 
         self.__status = new_status
 
-    # 🌟 3. เผื่อไว้: test.py ใน Step 3 มีการดึงข้อมูลเวลาและสนามไปโชว์ด้วย
-    @property
-    def play_date(self):
-        return self.__play_date
-        
-    @property
-    def course(self):
-        return self.__course
-        # สร้างคลาสใหม่สืบทอด (Inherit) จาก TeeTimeSlot ตาม Requirement
+# สร้างคลาสใหม่สืบทอด (Inherit) จาก TeeTimeSlot ตาม Requirement
 class Course1Reserve(TeeTimeSlot):
-    def __init__(self, play_date, course):
-        super().__init__(play_date, course)
-        self.__hole = 1 # ระบุชัดเจนว่าเป็นสล็อตสำหรับเริ่มที่หลุม 1
+    def __init__(self, play_date, time, course):
+        super().__init__(play_date, time, course) # ส่งค่าให้คลาสแม่จัดการ
+        self.__hole = 1 # เก็บค่าเฉพาะตัวไว้ที่นี่
+
+    @property
+    def get_hole(self): return self.__hole
