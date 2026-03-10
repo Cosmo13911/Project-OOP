@@ -28,7 +28,7 @@ class Scorecard:
     def course(self):
         return self.__course
 
-    def record_score(self, hole_number: int, stroke: int):
+    def record_score(self, hole_number  : int, stroke: int):
         if stroke > 0:
             # ตรวจสอบว่าเคยจดหลุมนี้ไปหรือยัง ถ้ามีให้ อัปเดต ถ้าไม่มีให้ append ใหม่
             for record in self.__scores:

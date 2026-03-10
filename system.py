@@ -8,6 +8,7 @@ from models.notification import Notification
 import random 
 from models.payment import Raincheck, RainCheckStatus
 from datetime import timedelta , datetime
+from models.payment import Payment, PaymentStatus
 
 
 class GreenValleySystem:
@@ -141,31 +142,8 @@ class GreenValleySystem:
         # สินค้าเหล่านี้ต้องมี ID และระบุจำนวนที่เหลือได้ 
         for p_id, name, price, stock in product_data:
             self.__products.append(Product(p_id, name, price, stock))
-
-        # 3. สร้าง Tournament
-        tour_res = self.create_tournament("Green Valley Open 2024", "2024-12-25", 2500.0, "C-001")
-        tour_id = tour_res["tournamentID"]
-        tour = self.find_tournament(tour_id)
-
-        # 4. จำลองการสมัครและชำระเงินสำหรับทั้ง 8 คน
-        for user in self.__users:
-            pay_info = self.register_tournament_get_payment(user.id, tour_id)
-            self.process_payment(pay_info["paymentID"]) # จ่ายเงินเพื่อเข้าสู่สถานะ Registered
-
-        # 5. ปิดรับสมัครและจัดกลุ่มก๊วน (Pairing)
-        # ขั้นตอนนี้จะสร้าง Booking และเปลี่ยนสถานะเป็น DRAW_PUBLISHED
-        self.close_registration_and_pairing(tour_id)
-
-        # 6. เริ่มการแข่งขัน (เปลี่ยนสถานะเป็น IN_PROGRESS เพื่อให้บันทึกคะแนนได้)
-        tour.update_status(TournamentStatus.IN_PROGRESS)
-
         # 7. สุ่มบันทึกคะแนนให้ครบ 18 หลุม สำหรับทุกคน (Simulation)
         # ตามข้อกำหนดที่ต้องการให้สุ่มเพิ่มคะแนนไว้แล้วทั้ง 18 หลุม
-        for user in self.__users:
-            for hole in range(1, 19):
-                # สุ่มคะแนน (Stroke) ระหว่าง 3 ถึง 6 (Par 4 +/-)
-                random_stroke = random.randint(3, 6)
-                self.record_tournament_score(tour_id, user.id, hole, random_stroke)
         # 4. จำลองการจอง (Transaction Class [cite: 8])
         # ต้องมีสถานะติดตาม (PENDING, CONFIRMED, CANCELLED) อย่างน้อย 3 สถานะ [cite: 12]
     
@@ -177,7 +155,7 @@ class GreenValleySystem:
 
 
     def add_caddy(self, name, level: CaddyLevel, fee):
-        new_id = f"C-{len(self.__caddies) + 1:03d}"
+        new_id = f"CDY-{len(self.__caddies) + 1:03d}"
         new_caddy = Caddy(new_id, name, level, fee)
         self.__caddies.append(new_caddy)
         return new_caddy
@@ -199,7 +177,7 @@ class GreenValleySystem:
         return [c for c in self.__carts if c.is_available(date, time)]
 
     def find_payment_by_id(self, paymentID):
-        return next((p for p in self.__payments if p.paymentID == paymentID), None)
+        return next((p for p in self.__payments if p.payment_id == paymentID), None)
     
     def find_user(self, user_id: str):
         for user in self.__users:
@@ -231,6 +209,12 @@ class GreenValleySystem:
                 return booking
         raise ValueError(f"Booking with ID {booking_id} not found")
 
+    def find_booking_by_member(self, member_id: str):
+        for booking in self.__bookings:
+            if booking.requester.id == member_id:
+                return booking.booking_id
+        raise ValueError(f"Booking with ID {member_id} not found")
+
     def find_product(self, product_id: str):
         for product in self.__products:
             if product.id == product_id:
@@ -245,7 +229,7 @@ class GreenValleySystem:
         return [c for c in self.__carts if c.is_available(date, time)]
         
     def find_payment_by_id(self, paymentID):
-        return next((p for p in self.__payments if p.paymentID == paymentID), None)
+        return next((p for p in self.__payments if p.payment_id == paymentID), None)
 
     def get_course_by_type(self, course_type):
         return next((c for c in self.__courses if c.type == course_type), None)
@@ -377,78 +361,28 @@ class GreenValleySystem:
         self.__tournaments.append(new_tour)
         return {"tournamentID": t_id, "course_assigned": course.name}
 
-    def register_tournament_get_payment(self, member_id: str, tour_id: str):
-        tour = self.find_tournament(tour_id)
-        if not tour: raise ValueError(f"Tournament with ID {tour_id} not found")
+    def process_payment(self, booking: Booking):
+        # 1. แยกส่วนประกอบของรหัส Payment        
+        try:    
+            member = self.find_user(booking.requester.id)
+            if not member:
+                raise ValueError(f"Member with ID {booking.requester.id} not found")
+            
+            payment = Payment(booking.calculate_total_price, member, booking_id=booking.booking_id)
+            payment.set_status(PaymentStatus.SUCCESS)
+            self.__payments.append(payment)
 
-        member = self.find_user(member_id)
-        if not member: raise ValueError(f"Member with ID {member_id} not found")
+            booking.set_status(BookingStatus.CONFIRMED_PAID)
+            
+            # [เพิ่ม] การแจ้งเตือนการชำระเงินเสร็จสิ้น
+            msg = f"Payment Successful! [{payment.get_type}] is confirmed."
+            member.add_notification(Notification(msg))     
+
+            return {"status": "SUCCESS", "message": msg}
+        except (IndexError, ValueError) as e:
+            raise ValueError(f"Error processing booking payment: {str(e)}")
+
         
-        if any(entry.id == member.id for entry in tour.registered_players):
-            raise ValueError("Already registered.")
-
-        p_id = f"PAY-{member_id}-{tour_id}"
-        return {"paymentID": p_id, "amount": tour.entry_fee, "message": "Proceed to payment"}
-
-
-    def process_payment(self, payment_id: str):
-        # 1. แยกส่วนประกอบของรหัส Payment
-        parts = payment_id.split("-")
-        
-        if not parts or parts[0] != "PAY":
-            raise ValueError(f"Invalid payment ID: {payment_id}")
-
-        # --- กรณีที่ 1: จ่ายเงินสำหรับการจองปกติ (Booking) ---
-        # รูปแบบ: PAY-BK-BK-001
-        if "BK" in parts:
-            try:
-                booking_id = f"{parts[2]}-{parts[3]}" 
-                booking = self.find_booking(booking_id)
-                if not booking:
-                    raise ValueError(f"Booking {booking_id} not found")
-
-                # อัปเดตสถานะการจอง
-                booking.set_status(BookingStatus.CONFIRMED_PAID)
-                
-                # [เพิ่ม] การแจ้งเตือนการชำระเงินเสร็จสิ้น
-                msg = f"Payment Successful! Your booking {booking_id} is confirmed."
-                booking.requester.add_notification(Notification(msg))
-                
-                return {"status": "SUCCESS", "message": msg}
-            except (IndexError, ValueError) as e:
-                raise ValueError(f"Error processing booking payment: {str(e)}")
-
-        # --- กรณีที่ 2: จ่ายเงินสำหรับทัวร์นาเมนต์ (Tournament) ---
-        # รูปแบบ: PAY-M-001-T-001
-        elif len(parts) == 5:
-            try:
-                member_id = f"{parts[1]}-{parts[2]}"
-                tour_id = f"{parts[3]}-{parts[4]}"
-                
-                tour = self.find_tournament(tour_id)
-                member = self.find_user(member_id)
-
-                if not tour or not member:
-                    raise ValueError("Tournament or Member not found")
-
-                # ดำเนินการเพิ่มผู้เล่นเข้าสู่ทัวร์นาเมนต์
-                if tour.add_player(member):
-                    # [เพิ่ม] การแจ้งเตือนการชำระเงินเสร็จสิ้น
-                    msg = f"Payment Successful! You are now registered for tournament: {tour.name}"
-                    if isinstance(member, Member):
-                        member.add_notification(Notification(msg))
-                    
-                    return {"status": "SUCCESS", "message": msg}
-                else:
-                    return {"status": "FAILED", "message": "Already registered or maximum players reached"}
-            except ValueError as e:
-                raise ValueError(f"Error processing tournament payment: {str(e)}")
-        
-        else:
-            raise ValueError(f"Unrecognized payment ID format: {payment_id}")
-
-# system.py
-
     def close_registration_and_pairing(self, tour_id):
         tour = self.find_tournament(tour_id)
         tour.update_status(TournamentStatus.CLOSED)
@@ -495,8 +429,6 @@ class GreenValleySystem:
         return f"Draw Published. {len(pairings)} groups assigned with tee times."
 
 
-# Project-OOP/system.py
-
     def record_tournament_score(self, tour_id: str, member_id: str, hole_number: int, stroke: int):
         tour = self.find_tournament(tour_id)
         if not tour: 
@@ -526,6 +458,49 @@ class GreenValleySystem:
             "tournament_name": tour.name,
             "status": tour.status.value,
             "leaderboard": tour.get_leaderboard()
+        }
+    
+    # เพิ่มลงในคลาส GreenValleySystem ในไฟล์ system.py
+    def process_registration_payment(self, member_id: str, tour_id: str):
+        """จัดการชำระเงินค่าสมัครทัวร์นาเมนต์และเพิ่มชื่อผู้เข้าแข่งขัน"""
+        # 1. ค้นหาข้อมูล Tournament และ Member
+        tour = self.find_tournament(tour_id)
+        member = self.find_user(member_id)
+
+        # 2. ตรวจสอบว่าเคยสมัครไปหรือยัง (ใช้ .id เพื่อเปรียบเทียบ)
+        if any(entry.id == member.id for entry in tour.registered_players):
+            raise ValueError("Already registered for this tournament.")
+
+        # 3. ตรวจสอบสถานะ Tournament (ต้องเปิดรับสมัครอยู่)
+        from models.enum import TournamentStatus
+        if tour.status != TournamentStatus.REGISTRATION_OPEN:
+            raise ValueError(f"Tournament registration is {tour.status.value}")
+
+        # 4. สร้างการชำระเงิน (Payment) จริงลงในระบบ
+        from models.payment import Payment, PaymentStatus
+        from models.notification import Notification
+
+        # สร้าง Payment สำหรับ Tournament
+        new_payment = Payment(
+            amount=tour.entry_fee, 
+            member=member, 
+            booking_id=f"TOUR-{tour_id}"
+        )
+        new_payment.set_status(PaymentStatus.SUCCESS) 
+        self.payment.append(new_payment) # บันทึกลงในรายการ payments ของระบบ
+
+        # 5. เพิ่มสมาชิกเข้าทัวร์นาเมนต์ (จะไปสร้าง Scorecard ให้อัตโนมัติใน models/tournament.py)
+        tour.add_player(member)
+
+        # 6. แจ้งเตือนสมาชิก
+        msg = f"Payment Successful for {tour.name}. Amount: {tour.entry_fee} THB"
+        member.add_notification(Notification(msg))
+
+        return {
+            "paymentID": new_payment.payment_id,
+            "amount": tour.entry_fee,
+            "status": "SUCCESS",
+            "message": msg
         }
     
     def end_tournament(self, tour_id):

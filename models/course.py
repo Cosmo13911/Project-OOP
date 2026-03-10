@@ -101,8 +101,8 @@ class TeeTimeSlot:
         # ทุก attribute เป็น private ทั้งหมด 
         self.__play_date = play_date
         self.__time = time
-        self.__course = course
         # มีสถานะติดตามอย่างน้อย 3 สถานะ 
+        self.__course = course
         self.__status = SlotStatus.AVAILABLE 
 
     @property
@@ -111,6 +111,8 @@ class TeeTimeSlot:
     def time(self): return self.__time
     @property
     def status(self): return self.__status
+    @property
+    def course(self): return self.__course
 
     @status.setter
     def status(self, new_status): 

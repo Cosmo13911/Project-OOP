@@ -59,6 +59,7 @@ class Booking:
         self.__caddy.clear()
         self.__carts.clear()
 
+    @property
     def calculate_total_price(self) -> float:
         """
         Method หลักในการคำนวณราคาสุทธิของทั้งการจอง

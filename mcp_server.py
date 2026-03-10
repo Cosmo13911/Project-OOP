@@ -20,30 +20,55 @@ sys.create_data()
 # ==========================================
 
 @mcp.tool()
-def view_bookings(booking_id: str = "BK-001"):
-    """ใช้ดูข้อมูลการจองปัจจุบัน และรายการสินค้าที่สั่งไว้ในบิลนั้น"""
+def pay_booking(booking_id: str):
+    """
+    ยืนยันการชำระเงินสำหรับการจองสนาม 
+    เมื่อสำเร็จจะเปลี่ยนสถานะ Booking เป็น CONFIRMED
+    """
     try:
-        if not sys.bookings:
-            return {"message": "No bookings found"}
-            
+        # 2. ค้นหาการจอง
         booking = sys.find_booking(booking_id)
         if not booking:
-            return {"error": "Booking not found"}
+            return {"error": f"ไม่พบข้อมูลการจองรหัส {booking_id}"}
 
-        # ดึงรายการ order และคำนวณยอดสุทธิ (เรียกใช้ property calculate_net_total)
-        orders_list = [
-            {"order_id": order.id, "net_total": order.calculate_net_total} 
-            for order in booking.orders
-        ]
-            
-        return {
-            "id": booking.booking_id,
-            "requester": booking.requester.name,
-            "orders": orders_list
-        }
+        # 4. ดำเนินการชำระเงิน (เรียกใช้ process_payment ใน system)
+        payment_result = sys.process_payment(booking)
+        
+        # 5. อัปเดตสถานะการจองเป็น CONFIRMED (ถ้าชำระเงินสำเร็จ)
+        if "successfully" in payment_result:
+            booking.set_statusc_confirmed() # สมมติว่ามี method นี้ใน model booking
+            return {
+                "message": f"ชำระเงินสำหรับการจอง {booking_id} สำเร็จ!",
+                "payment_details": payment_result,
+                "booking_status": "CONFIRMED"
+            }
+        
+        return {"error": "การชำระเงินไม่สำเร็จ", "details": payment_result}
     except Exception as e:
         return {"error": str(e)}
 
+@mcp.tool()
+def view_payment_history(user_id: str):
+    """ดูประวัติการชำระเงินทั้งหมดของผู้ใช้"""
+    try:
+        user = sys.find_user(user_id)
+        if not user:
+            return {"error": "ไม่พบผู้ใช้งาน"}
+            
+        history = []
+        for p in sys.get_payments():
+            # กรองเฉพาะ payment ที่เกี่ยวข้องกับ user นี้ (ตรวจสอบจาก ID หรือข้อมูลอ้างอิง)
+            if user_id in p.id: 
+                history.append({
+                    "payment_id": p.id,
+                    "amount": p.amount,
+                    "status": p.status.value,
+                    "date": p.timestamp
+                })
+        return {"user": user.name, "payment_history": history}
+    except Exception as e:
+        return {"error": str(e)}
+    
 @mcp.tool()
 def view_products():
     """ใช้ดูรายการสินค้าทั้งหมดในระบบ พร้อมราคาและสต็อกที่เหลือ"""
@@ -113,7 +138,7 @@ def select_booking_addons(
         # 4. ล้างค่าเดิมก่อนเริ่มการจองใหม่ (Encapsulation Principle)
         booking.clear_addons()
 
-        raw_date = booking.slot.get_play_date 
+        raw_date = booking.slot.play_date 
         time = booking.slot.time
 
         # 2. แปลงจาก YYYY-MM-DD เป็น DD-MM-YYYY สำหรับ Add-ons Module
@@ -233,7 +258,7 @@ def admin_view_all_payments():
         # ดึงข้อมูลผ่าน property payment
         payment_history = [
             {
-                "payment_id": p.paymentID, 
+                "payment_id": p.payment_id, 
                 "status": "SUCCESS", # หรือดึงจากสถานะจริงใน object
                 "amount": getattr(p, 'amount', 0)
             } for p in sys.payment
@@ -308,24 +333,61 @@ def view_tournaments():
     except Exception as e:
         return {"error": str(e)}
 
+# @mcp.tool()
+# def register_tournament(member_id: str, tour_id: str):
+#     """
+#     สมัครเข้าแข่งขันในทัวร์นาเมนต์โดยตรง (ไม่จำเป็นต้องมีการจองสนามก่อน)
+#     ระบบจะทำการหักค่าธรรมเนียมและเพิ่มชื่อเข้าสู่รายชื่อผู้แข่งขันทันที
+#     """
+#     try:
+#         # 1. ค้นหาออบเจกต์ Member และ Tournament จากระบบ
+#         member = sys.find_user(member_id)
+#         if not member: raise ValueError(f"ไม่พบข้อมูลสมาชิก ID {member_id}")
+#         tour = sys.find_tournament(tour_id)
+#         if not tour : raise ValueError(f"ไม่พบข้อมูลทัวร์นาเมนต์ ID {tour_id}")
+#         # 2. ตรวจสอบสถานะว่าทัวร์นาเมนต์ยังเปิดรับสมัครอยู่หรือไม่
+#         # โดยเช็คจาก TournamentStatus.REGISTRATION_OPEN
+#         if tour.status.value != "REGISTRATION_OPEN":
+#             return {"error": f"ทัวร์นาเมนต์ {tour.name} ปิดรับสมัครแล้ว หรือยังไม่เปิดให้ลงชื่อ"}
+
+#         # 3. ตรวจสอบว่าสมาชิกคนนี้สมัครไปแล้วหรือยัง เพื่อป้องกันข้อมูลซ้ำ
+#         if member in tour.registered_players:
+#             return {"error": f"สมาชิก {member.name} ได้สมัครทัวร์นาเมนต์นี้เรียบร้อยแล้ว"}
+
+
+#         # 5. เพิ่มสมาชิกเข้าสู่ทัวร์นาเมนต์
+#         # ฟังก์ชัน add_player จะทำการสร้าง Scorecard ให้สมาชิกโดยอัตโนมัติ
+#         tour.add_player(member)
+
+#         # 6. ส่งการแจ้งเตือนไปยังสมาชิก
+#         msg = f"สมัครทัวร์นาเมนต์ {tour.name} สำเร็จ! ชำระค่าธรรมเนียม {entry_fee:,.2f} บาท เรียบร้อยแล้ว"
+#         member.add_notification(Notification(msg))
+
+#         return {
+#             "status": "Success",
+#             "message": msg,
+#             "details": {
+#                 "tournament": tour.name,
+#                 "player": member.name,
+#                 "fee_paid": entry_fee,
+#                 "payment_id": payment.paymentID
+#             }
+#         }
+
+#     except Exception as e:
+#         # กรณีไม่พบ user_id หรือ tour_id ระบบจะ raise error จาก find_user/find_tournament
+#         return {"error": str(e)}
+
 @mcp.tool()
 def register_tournament(member_id: str, tour_id: str):
-    """สมัครเข้าแข่งขันในทัวร์นาเมนต์ (ระบบจะคืนรหัส Payment)"""
+    """สมัครเข้าแข่งขันและชำระเงินค่าธรรมเนียมทัวร์นาเมนต์ทันที"""
     try:
-        result = sys.register_tournament_get_payment(member_id, tour_id)
+        # เรียกใช้เมธอดที่เราเพิ่งเพิ่มใน system.py
+        result = sys.process_registration_payment(member_id, tour_id)
         return result
     except Exception as e:
         return {"error": str(e)}
-
-@mcp.tool()
-def process_tournament_payment(payment_id: str):
-    """ชำระเงินค่าสมัครทัวร์นาเมนต์หรือค่าจองสนาม"""
-    try:
-        result = sys.process_payment(payment_id)
-        return result
-    except Exception as e:
-        return {"error": str(e)}
-
+    
 @mcp.tool()
 def view_my_notifications(member_id: str):
     """ดูการแจ้งเตือนส่วนตัวของสมาชิก (เช่น ยืนยันการจอง/การจ่ายเงิน)"""
