@@ -1,25 +1,25 @@
-from enum import Enum
 from abc import ABC, abstractmethod
 from models.enum import Tier, UserStatus
 from models.notification import Notification
-from datetime import datetime
+from datetime import timedelta , datetime
+
 class History:
-    def __init__(self, scorecard_instance, round_type="GENERAL"):
+    def __init__(self, sc__score_card_instance, round_type="GENERAL"):
         """
-        scorecard_instance: รับเป็นออบเจกต์ Scorecard เลย (เพราะข้างในมี Course และ List ของ ScoreRecord ครบหมดแล้ว)
+        sc__score_card_instance: รับเป็นออบเจกต์ sc__score_card เลย (เพราะข้างในมี Course และ List ของ ScoreRecord ครบหมดแล้ว)
         """
-        self.__scorecard = scorecard_instance
+        self.__score_card = sc__score_card_instance
         self.__round_type = round_type
         self.__date = datetime.now() # เก็บวันที่บันทึกประวัติ
 
-        # 🌟 โค้ดสั้นลงมาก! เพราะเราโยนหน้าที่คำนวณไปให้ Scorecard และ ScoreRecord ทำหมดแล้ว
-        self.__gross_score = self.__scorecard.get_gross_score()
-        self.__adjusted_score = self.__scorecard.get_adjusted_score()
+        # 🌟 โค้ดสั้นลงมาก! เพราะเราโยนหน้าที่คำนวณไปให้ sc__score_card และ ScoreRecord ทำหมดแล้ว
+        self.__gross_score = self.__score_card.get_gross_score()
+        self.__adjusted_score = self.__score_card.get_adjusted_score()
 
     # --- Properties ---
     @property
-    def scorecard(self):
-        return self.__scorecard
+    def sc__score_card(self):
+        return self.__score_card
 
     @property
     def round_type(self):
@@ -39,8 +39,8 @@ class History:
 
     @property
     def course(self):
-        # ดึง Course ผ่าน Scorecard ได้เลย
-        return self.__scorecard.course
+        # ดึง Course ผ่าน sc__score_card ได้เลย
+        return self.__score_card.course
 # 1. Abstract Class
 class User(ABC):
     def __init__(self, user_id: str, name: str, phone: str):
@@ -72,14 +72,25 @@ class Golfer(User):
     def history(self):
         return self.__history
 
-    # 🌟 ฟังก์ชันเสริม: เอาไว้รับคะแนนจาก Scorecard มาใส่ประวัติ
-    def add_history(self, scorecard_instance, round_type="General"):
+    # 🌟 ฟังก์ชันเสริม: เอาไว้รับคะแนนจาก sc__score_card มาใส่ประวัติ
+    def add_history(self, sc__score_card_instance, round_type="General"):
 
-        new_record = History(scorecard_instance)
+        new_record = History(sc__score_card_instance)
 
         self.__history.append(new_record)
         self.calculate_handicap()
-        print(f"Added {round_type} round to history and updated handicap.")
+        return (f"Added {round_type} round to history and updated handicap.")
+
+    def add_strike(self,number:int):
+        self.__strikes += number
+        now = datetime.now()
+        if self.__strikes == 2:
+            self.__weekend_ban_until = now + timedelta(days=30)
+            self.__status = UserStatus.WEEKEND_BAN
+        elif self.__strikes >= 3:
+            self.__suspended_until = now + timedelta(days=60)
+            self.__status = UserStatus.BANNED
+                    
 
     def calculate_handicap(self):
         if len(self.__history) < 3:
@@ -89,10 +100,12 @@ class Golfer(User):
         differentials = []
 
         for record in recent_history:
-            # 🌟 เปลี่ยนจาก record.gross_score เป็น record.adjusted_score !!
-            # เพื่อให้ Handicap แม่นยำตามมาตรฐาน WHS
-            diff = (record.adjusted_score - record.course.rating) * (113 / record.course.slope_rating)
-            differentials.append(diff)
+            # เรียกใช้ get_gross_score() ที่เราแก้ให้คำนวณจาก List แล้ว
+            gross_score = record.score_card.get_gross_score() 
+            
+            # คำนวณ Differential โดยใช้ค่าจาก Course ที่ผูกกับ sc__score_card นั้นๆ
+            diff = (gross_score - record.score_card.course.rating) * (113 / record.score_card.course.slope_rating)
+            differentials.append(diff)        
         differentials.sort()
         num_scores = len(differentials)
 
@@ -144,12 +157,8 @@ class Member(Golfer):
 
     # 3. Polymorphism: Member ได้ส่วนลดตาม Tier (สิทธิ์/ส่วนลด 1 ประเภท)
     def calculate_discount(self, amount: float) -> float:
-        discount_rate = {
-            Tier.PLATINUM: 0.15, # ลด 15%
-            Tier.GOLD: 0.10,     # ลด 10%
-            Tier.SILVER: 0.05    # ลด 5%
-        }.get(self.__tier, 0.0)
-        return amount * discount_rate
+        return amount * self.__tier.discount_rate
+    
 
     def add_notification(self, notification: Notification):
         self.__notifications.append(notification)
@@ -165,4 +174,5 @@ class Guest(Golfer):
 
     # 3. Polymorphism: Guest ไม่ได้ส่วนลด
     def calculate_discount(self, amount: float) -> float:
-        return 0.0
+        return amount
+    

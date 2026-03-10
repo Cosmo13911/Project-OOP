@@ -1,10 +1,15 @@
-from models.users import Member, Guest
+from models.users import Member, Guest, Golfer
 from models.tournament import Tournament
 from models.course import Course
-from models.resources import Product, Order, OrderItem, CartType, Caddy, CaddyLevel
+from models.resources import Product, Order, OrderItem, CartType, Caddy, CaddyLevel , GolfCart
 from models.booking import Booking
-from models.enum import SlotStatus, BookingStatus, TournamentStatus, Tier, CourseType
+from models.enum import SlotStatus, BookingStatus, TournamentStatus, Tier, CourseType 
 from models.notification import Notification
+import random 
+from models.payment import Raincheck, RainCheckStatus
+from datetime import timedelta , datetime
+
+
 class GreenValleySystem:
     MAX_GOLFERS_PER_GROUP = 4
 
@@ -14,6 +19,10 @@ class GreenValleySystem:
         self.__products = []
         self.__bookings = []
         self.__tournaments = []
+        self.__caddies = []
+        self.__carts = []
+        self.__rain_checks = []
+        self.__payments = []
 
     @property
     def users(self): return self.__users
@@ -24,12 +33,15 @@ class GreenValleySystem:
     @property
     def tournaments(self): return self.__tournaments
     @property
-    def get_all_users(self): return self.__users
-    @property
     def get_all_courses(self): return self.__courses
     @property
-    def get_all_products(self): return self.__products
-
+    def caddies(self): return self.__caddies
+    @property
+    def carts(self): return self.__carts
+    @property
+    def rain_check(self): return self.__rain_check
+    @property
+    def payment (self): return self.__payments    
 
     def create_data(self):
         # 1. สร้างกลุ่มผู้ใช้ (Actors อย่างน้อย 2 กลุ่ม ตามข้อกำหนด [cite: 24])
@@ -52,11 +64,41 @@ class GreenValleySystem:
             ("P-004", "Iced Americano", 75, 100),
             ("P-005", "Thai Tea", 55, 100)
         ]
-        
+        # ===============================================
+        # walk in na ja
+        caddy_data = [
+            ("พี่แนน (Pro)", CaddyLevel.PRO, 600),
+            ("น้องฝ้าย (Regular)", CaddyLevel.REGULAR, 450),
+            ("พี่นุ่น (Pro)", CaddyLevel.PRO, 600),
+            ("น้องโบว์ (Regular)", CaddyLevel.REGULAR, 450),
+            ("สมชาย (Trainee)", CaddyLevel.TRAINEE, 350),
+            ("สมศรี (Trainee)", CaddyLevel.TRAINEE, 350),
+            ("สมหญิง (Trainee)", CaddyLevel.TRAINEE, 350)
+        ]
+
+        golf_cart_data = [
+            (CartType.STANDARD, 700, 5), 
+            (CartType.COUPLE, 1200, 2), 
+            (CartType.VIP, 2000, 3)
+        ]
+        # สร้างสมาชิกที่มี Strike
+
         for u_id, name, phone, tier in user_data:
             # ทุก attribute ใน Member ต้องเป็น private 
             self.__users.append(Member(u_id, name, phone, tier))
 
+        for name, level, fee in caddy_data:
+            self.add_caddy(name, level, fee)
+
+        for cart_type, fee, quantity in golf_cart_data:
+            self.add_golfcart(cart_type, fee, quantity)
+
+        # self.__users.append(Guest("G-001", "Somchai Guest", "089-999-9999")) 
+
+        # m4 = self.add_member("Tim (Silver)", "083-111-5645", Tier.SILVER)
+        # m4.add_strike(3) 
+        # m5 = self.add_member("Jill (Platinum)", "083-121-777", Tier.PLATINUM)
+        # m5.add_strike(2)
         # 2. สร้างสนามกอล์ฟ 2 สนาม (Entity Class ที่มี ID และจำกัดจำนวน [cite: 10, 11])
         # สนามที่ 1: Blue Canyon Championship (ยากพิเศษ)
         c1 = Course("C-001", "Blue Canyon Championship", 3500, 4500, CourseType.CHAMPIONSHIP, rating=99.9, slope_rating=148)
@@ -100,9 +142,65 @@ class GreenValleySystem:
         for p_id, name, price, stock in product_data:
             self.__products.append(Product(p_id, name, price, stock))
 
+        # 3. สร้าง Tournament
+        tour_res = self.create_tournament("Green Valley Open 2024", "2024-12-25", 2500.0, "C-001")
+        tour_id = tour_res["tournamentID"]
+        tour = self.find_tournament(tour_id)
+
+        # 4. จำลองการสมัครและชำระเงินสำหรับทั้ง 8 คน
+        for user in self.__users:
+            pay_info = self.register_tournament_get_payment(user.id, tour_id)
+            self.process_payment(pay_info["paymentID"]) # จ่ายเงินเพื่อเข้าสู่สถานะ Registered
+
+        # 5. ปิดรับสมัครและจัดกลุ่มก๊วน (Pairing)
+        # ขั้นตอนนี้จะสร้าง Booking และเปลี่ยนสถานะเป็น DRAW_PUBLISHED
+        self.close_registration_and_pairing(tour_id)
+
+        # 6. เริ่มการแข่งขัน (เปลี่ยนสถานะเป็น IN_PROGRESS เพื่อให้บันทึกคะแนนได้)
+        tour.update_status(TournamentStatus.IN_PROGRESS)
+
+        # 7. สุ่มบันทึกคะแนนให้ครบ 18 หลุม สำหรับทุกคน (Simulation)
+        # ตามข้อกำหนดที่ต้องการให้สุ่มเพิ่มคะแนนไว้แล้วทั้ง 18 หลุม
+        for user in self.__users:
+            for hole in range(1, 19):
+                # สุ่มคะแนน (Stroke) ระหว่าง 3 ถึง 6 (Par 4 +/-)
+                random_stroke = random.randint(3, 6)
+                self.record_tournament_score(tour_id, user.id, hole, random_stroke)
         # 4. จำลองการจอง (Transaction Class [cite: 8])
         # ต้องมีสถานะติดตาม (PENDING, CONFIRMED, CANCELLED) อย่างน้อย 3 สถานะ [cite: 12]
+    
+    def add_member(self, name, phone, tier: Tier,handicap: float = 0.0):
+        new_id = f"M-{len(self.__users) + 1:03d}"
+        new_member = Member(new_id, name, phone, tier , handicap)
+        self.__users.append(new_member)
+        return new_member
 
+
+    def add_caddy(self, name, level: CaddyLevel, fee):
+        new_id = f"C-{len(self.__caddies) + 1:03d}"
+        new_caddy = Caddy(new_id, name, level, fee)
+        self.__caddies.append(new_caddy)
+        return new_caddy
+
+    def add_golfcart(self, cart_type: CartType, fee: float, quantity: int = 1):
+        added_carts = []
+        for _ in range(quantity):
+            new_id = f"CRT-{len(self.__carts) + 1:03d}"
+            new_cart = GolfCart(new_id, cart_type, fee)
+            self.__carts.append(new_cart)
+            added_carts.append(new_cart)
+        return added_carts # คืนค่ากลุ่มรายการรถที่ถูกเพิ่มเข้าไป
+    
+
+    def find_available_caddies(self, date: str, time: str):
+        return [c for c in self.__caddies if c.is_available(date, time)]
+    
+    def find_available_carts(self, date: str, time: str):
+        return [c for c in self.__carts if c.is_available(date, time)]
+
+    def find_payment_by_id(self, paymentID):
+        return next((p for p in self.__payments if p.paymentID == paymentID), None)
+    
     def find_user(self, user_id: str):
         for user in self.__users:
             if user.id == user_id:
@@ -114,6 +212,12 @@ class GreenValleySystem:
             if course.id == course_id:
                 return course
         raise ValueError(f"Course with ID {course_id} not found")
+
+    def find_available_carts(self, date, time):
+    # กรองเฉพาะรถกอล์ฟที่มีสถานะว่างใน Slot เวลานั้นๆ 
+    # และต้องเป็นไปตามเงื่อนไข 'Entity Class มีจำนวนจำกัด' 
+        available = [cart for cart in self.__carts if cart.is_available(date, time)]
+        return available
 
     def find_tournament(self, tour_id: str):
         for tour in self.__tournaments:
@@ -133,6 +237,54 @@ class GreenValleySystem:
                 return product
         raise ValueError(f"Product with ID {product_id} not found")
 
+    # ------------------- booking ----------------------- #
+    def find_available_caddies(self, date: str, time: str):
+        return [c for c in self.__caddies if c.is_available(date, time)]
+    
+    def find_available_carts(self, date: str, time: str):
+        return [c for c in self.__carts if c.is_available(date, time)]
+        
+    def find_payment_by_id(self, paymentID):
+        return next((p for p in self.__payments if p.paymentID == paymentID), None)
+
+    def get_course_by_type(self, course_type):
+        return next((c for c in self.__courses if c.type == course_type), None)
+
+    def check_booking_lead_time(self, user, date_str: str):
+        now = datetime.now().date()
+        
+        target_date = datetime.strptime(date_str, "%d-%m-%Y").date()
+        if not target_date: raise ValueError("Invalid date format. Use DD-MM-YYYY.")
+
+        # กรณี Guest (Walk-in)
+        if isinstance(user, Guest):
+            if target_date != now:
+                raise ValueError("Walk-in guests can only book for the same day")
+
+        # กรณี Member ตาม Tier
+        diff_days = (target_date - now).days
+
+        # ใช้ .tier เพราะเราทำ encapsulation ไว้ในไฟล์ users.py แล้ว
+        limit = user.tier.booking_day_limit.day_limit
+        if diff_days > limit:
+            raise ValueError(f"{user.name} ({user.tier.name}) can only book up to {limit} days in advance. You tried to book {diff_days} days ahead.")
+        
+    def check_5_hour_rule(self, identifier: str, new_date: str, new_time: str):
+        new_dt = datetime.strptime(f"{new_date} {new_time}", "%d-%m-%Y %H:%M")
+        
+        for b in self.__bookings:
+            # 📌 กรองเฉพาะคิวที่ไม่ได้ยกเลิก และ "จองในวันเดียวกัน" จะได้ทำงานเร็วขึ้น
+            if b.status.value != "CANCELLED" and b.slot.play_date == new_date:
+                existing_dt = datetime.strptime(f"{b.slot.play_date} {b.slot.time}", "%d-%m-%Y %H:%M")
+                time_diff = abs((new_dt - existing_dt).total_seconds()) / 3600
+                
+                if time_diff < 5:
+                    for g in b.golfers:
+                        # 📌 เช็คคลุมทั้ง user_id (Member) และเบอร์โทร (Walk-in) ในบรรทัดเดียว!
+                        if g.user_id == identifier or getattr(g, 'phone', '') == identifier:
+                            return False # ปฏิเสธการจอง (เจอคิวซ้ำ)
+        return True # ผ่าน
+    
     def create_booking(self, requester_id: str, course_id: str, date: str, time: str, companion_ids: list = None):
         if companion_ids is None:
             companion_ids = []
@@ -232,85 +384,138 @@ class GreenValleySystem:
         member = self.find_user(member_id)
         if not member: raise ValueError(f"Member with ID {member_id} not found")
         
-        if any(entry.player.user_id == member.user_id for entry in tour.registered_players):
+        if any(entry.id == member.id for entry in tour.registered_players):
             raise ValueError("Already registered.")
 
         p_id = f"PAY-{member_id}-{tour_id}"
         return {"paymentID": p_id, "amount": tour.entry_fee, "message": "Proceed to payment"}
 
+
     def process_payment(self, payment_id: str):
-        # จำลองการจ่ายเงินผ่าน
+        # 1. แยกส่วนประกอบของรหัส Payment
         parts = payment_id.split("-")
-        if len(parts) == 3:
-            member_id = f"{parts[1]}-{parts[2]}" # M-001 -> PAY-M-001-T-001 -> len is 4. Let's fix.
-            member_id = parts[1] + "-" + parts[2]
-            tour_id = parts[3] + "-" + parts[4] if len(parts)==5 else parts[-2]+"-"+parts[-1]
-            
-        tour = self.find_tournament(tour_id)
-        if not tour: raise ValueError("Tournament not found.")
+        
+        if not parts or parts[0] != "PAY":
+            raise ValueError(f"Invalid payment ID: {payment_id}")
 
-        member = self.find_user(member_id)
-        if not member: raise ValueError("Member not found.")
+        # --- กรณีที่ 1: จ่ายเงินสำหรับการจองปกติ (Booking) ---
+        # รูปแบบ: PAY-BK-BK-001
+        if "BK" in parts:
+            try:
+                booking_id = f"{parts[2]}-{parts[3]}" 
+                booking = self.find_booking(booking_id)
+                if not booking:
+                    raise ValueError(f"Booking {booking_id} not found")
 
-        if tour.add_player(member):
-            return {"status": "SUCCESS", "message": "Confirmed"}
+                # อัปเดตสถานะการจอง
+                booking.set_status(BookingStatus.CONFIRMED_PAID)
+                
+                # [เพิ่ม] การแจ้งเตือนการชำระเงินเสร็จสิ้น
+                msg = f"Payment Successful! Your booking {booking_id} is confirmed."
+                booking.requester.add_notification(Notification(msg))
+                
+                return {"status": "SUCCESS", "message": msg}
+            except (IndexError, ValueError) as e:
+                raise ValueError(f"Error processing booking payment: {str(e)}")
 
+        # --- กรณีที่ 2: จ่ายเงินสำหรับทัวร์นาเมนต์ (Tournament) ---
+        # รูปแบบ: PAY-M-001-T-001
+        elif len(parts) == 5:
+            try:
+                member_id = f"{parts[1]}-{parts[2]}"
+                tour_id = f"{parts[3]}-{parts[4]}"
+                
+                tour = self.find_tournament(tour_id)
+                member = self.find_user(member_id)
+
+                if not tour or not member:
+                    raise ValueError("Tournament or Member not found")
+
+                # ดำเนินการเพิ่มผู้เล่นเข้าสู่ทัวร์นาเมนต์
+                if tour.add_player(member):
+                    # [เพิ่ม] การแจ้งเตือนการชำระเงินเสร็จสิ้น
+                    msg = f"Payment Successful! You are now registered for tournament: {tour.name}"
+                    if isinstance(member, Member):
+                        member.add_notification(Notification(msg))
+                    
+                    return {"status": "SUCCESS", "message": msg}
+                else:
+                    return {"status": "FAILED", "message": "Already registered or maximum players reached"}
+            except ValueError as e:
+                raise ValueError(f"Error processing tournament payment: {str(e)}")
+        
+        else:
+            raise ValueError(f"Unrecognized payment ID format: {payment_id}")
+
+# system.py
 
     def close_registration_and_pairing(self, tour_id):
-        # Phase 2: Closing & Mass Booking
-        tour = self.find_tournament_by_id(tour_id)
-        if not tour: raise ValueError("Tournament not found.")
-
-        tour.updateStatus(TournamentStatus.CLOSED)
-        pairings = tour.generatePairing()
+        tour = self.find_tournament(tour_id)
+        tour.update_status(TournamentStatus.CLOSED)
         
-        # 🌟 1. ดึงสนามและวันที่ มาจากข้อมูลงานแข่งโดยตรง
+        pairings = tour.generate_pairing() # ได้ list ของ match_group
         course = tour.course 
-        target_date = tour.date # สมมติว่าเก็บค่าเป็น "2026-12-02"
+        target_date = tour.date 
+        course.generate_slots_for_date(target_date)
         
-        # 🌟 2. สั่งให้ระบบเตรียมสล็อตของ "วันนั้น" ให้พร้อม
-        self.ensure_slots_for_date(course, target_date)
-        
-        # Loop Every 4 Players
-        for group in pairings:
-            # 🌟 3. หาสล็อตว่าง "เฉพาะของวันที่จัดแข่งเท่านั้น" (กันพลาดไปดึงของวันอื่น)
+        for group_obj in pairings:
+            current_players = group_obj.players
+            
+            # 1. ค้นหาสล็อตว่าง
+            available_slot = None
             for slot in course.slots:
-                if slot.status == SlotStatus.AVAILABLE and slot.play_date.startswith(target_date):
+                if slot.status == SlotStatus.AVAILABLE and slot.play_date == target_date:
                     available_slot = slot
-                    return available_slot
-            raise ValueError(f"No available slots on {target_date} for course {course.name}")
+                    break
             
-            b_id = f"BK-{len(self.__bookings) + 1:03d}"
-            new_booking = Booking(b_id, group[0], available_slot) # คนแรกเป็น Requester
-            new_booking.update_status(BookingStatus.CONFIRMED_PAID)
-            new_booking.add_golfers(group[1:]) # ยัดคนที่เหลือเข้าก๊วน
+            if not available_slot:
+                raise ValueError(f"No available slots on {target_date}")
             
-            # เปลี่ยนสถานะเป็น RESERVED เพื่อไม่ให้ก๊วนอื่นมาแย่ง (ป้องกันคิวชน)
-            available_slot.update_status(SlotStatus.RESERVED)
-            self.__bookings.append(new_booking)
-            tour.add_match_booking(new_booking)
+            # 2. ผูกสล็อตเข้ากับกลุ่มการแข่ง
+            group_obj.slot = available_slot
+            
+            # 3. สร้าง Booking และส่ง Notification
+            b_id = f"BK-T-{len(self.bookings) + 1:03d}"
+            new_booking = Booking(b_id, current_players[0], available_slot)
+            new_booking.set_status(BookingStatus.CONFIRMED_PAID)
+            
+            for companion in current_players[1:]:
+                new_booking.add_golfer(companion)
+            
+            # --- เพิ่มส่วนการแจ้งเตือนรอบเวลาแข่ง ---
+            msg = f"Tournament {tour.name}: Your Tee-off is at {available_slot.time} on {target_date}."
+            for p in current_players:
+                p.add_notification(Notification(msg))
+            
+            available_slot.status = SlotStatus.RESERVED 
+            self.bookings.append(new_booking)
+            tour.match_bookings.append(new_booking)
 
-            # แจ้งเตือน Notification ตอนนี้จะเป็นเวลาและวันที่ที่ถูกต้องแล้ว
-            details = f"Tee Time Assigned: {available_slot.play_date} for Tournament: {tour.name}"
-            
-            for member in group:
-                self.create_notification(member, details)
+        tour.update_status(TournamentStatus.DRAW_PUBLISHED)
+        return f"Draw Published. {len(pairings)} groups assigned with tee times."
 
-        tour.updateStatus(TournamentStatus.DRAW_PUBLISHED)
-        return f"Draw Published. {len(pairings)} groups assigned."
-    
+
+# Project-OOP/system.py
+
     def record_tournament_score(self, tour_id: str, member_id: str, hole_number: int, stroke: int):
         tour = self.find_tournament(tour_id)
         if not tour: 
             raise ValueError("Tournament not found")
+        
+        # 🌟 เพิ่มบรรทัดนี้: ค้นหาออบเจกต์ Member จริงๆ จาก ID ก่อน
+        member_obj = self.find_user(member_id)
+        if not member_obj:
+            raise ValueError(f"Member with ID {member_id} not found")
+
         if tour.status.value != "IN_PROGRESS": 
             raise ValueError("Tournament is not in progress")
 
-        success = tour.record_score(member_id, hole_number, stroke)
+        # 🌟 แก้ไข: ส่ง member_obj (Object) แทน member_id (String)
+        success = tour.record_player_score(member_obj, hole_number, stroke)
         if not success: 
-            raise ValueError("Failed to record score. Check member ID, hole number, or stroke value.")
+            raise ValueError("Failed to record score. Scorecard not found for this member.")
         
-        return {"message": f"Score recorded for {member_id}: Hole {hole_number} = {stroke}"}
+        return {"message": f"Score recorded for {member_obj.name}: Hole {hole_number} = {stroke}"}
 
     def get_tournament_leaderboard(self, tour_id: str):
         tour = self.find_tournament(tour_id)
@@ -334,7 +539,7 @@ class GreenValleySystem:
         updated_players = []
 
         # 🌟 1. เปลี่ยนมาวนลูป List ของออบเจกต์ Scorecard โดยตรง
-        for sc in tour.scorecards:
+        for sc in tour.score_cards:
             # 🌟 2. ความงดงามของ OOP! เราดึง Member จาก Scorecard ได้เลย ไม่ต้อง find_user_by_id แล้ว
             member = sc.member 
             if not member:
@@ -351,3 +556,33 @@ class GreenValleySystem:
             "message": f"ปิดการแข่งขัน {tour.name} เรียบร้อยแล้ว",
             "players_updated": updated_players
         }
+
+    def issue_raincheck_to_user(self, user_id: str, amount: float): #✔️
+        user = self.find_user_by_id(user_id)
+        if not user : raise ValueError("Not found user id")
+        
+        if user and isinstance(user, Golfer):
+            auto_code = f"RC-{len(self.__rain_checks) + 1:04d}-{user_id}"
+            # ดึงเบอร์จาก User เพื่อให้ code ผูกติดกับเบอร์
+            new_rc = Raincheck(code=auto_code, amount=amount, phone=user.phone)
+            # เพพิ่มลงใน system & user(member/guest)
+            self.__rain_checks.append(new_rc)
+            user.add_raincheck(new_rc)
+            # ส่ง noti ไปที่ member 
+            msg = f"คุณได้รับคูปอง Rain Check รหัส {auto_code} มูลค่า {amount:,.2f} บาท"
+            
+            if user and isinstance(user, Member):
+                user.add_notification(Notification(msg))
+                
+            return new_rc
+        return None
+    
+        # เช็ค Raincheck ด้วย code และ user_id โดยดู code ที่ผูกติดกับเบอร์ผ่าน user_id
+    def validate_and_use_raincheck(self, code: str, phone: str):
+        if not code: return 0
+        voucher = next((v for v in self.__rain_checks 
+                        if v.code == code and v.phone == phone and v.status == RainCheckStatus.VALID), None)
+        if voucher:
+            voucher.mark_as_used()
+            return voucher.amount
+        return -1

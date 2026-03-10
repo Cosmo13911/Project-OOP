@@ -1,32 +1,22 @@
-
-from enum import Enum
 from datetime import datetime
-
-# class Payment:
-    # def __init__(self, payment_id, amount, p_type, member, tournament_id):
-    #     self.paymentID = payment_id
-    #     self.amount = amount
-    #     self.type = p_type
-    #     self.status = PaymentStatus.PENDING
-    #     self.member = member # เก็บออบเจกต์ Member
-    #     self.tournamentID = tournament_id
+from models.enum import PaymentStatus, RainCheckStatus
 
 class Payment:
-    def __init__(self, payment_id, amount, p_type, member, tournament_id):
-        self.__paymentID = payment_id
-    def __init__(self, paymentID, booking_id, amount, breakdown, individual_bills):
-        self.__paymentID = paymentID
-        self.__booking_id = booking_id
+    def __init__(self, payment_id, amount, p_type, member, booking_id=None, tournament_id=None, breakdown=None, individual_bills=None):
+        self.__payment_id = payment_id
         self.__amount = amount
         self.__type = p_type
-        self.__breakdown = breakdown # สรุปยอดรวมของทั้งใบจองถูกแบ่งเป็นค่าบริการหมวดหมู่ไหนบ้าง หมวดละเท่าไหร่
-        self.__individual_bills = individual_bills #ยอดที่แต่ละคนต้องจ่าย
+        self.__member = member
+        self.__booking_id = booking_id
+        self.__tournament_id = tournament_id
+        self.__breakdown = breakdown
+        self.__individual_bills = individual_bills
         self.__status = PaymentStatus.PENDING
-        self.__member = member # เก็บออบเจกต์ Member
-        self.__tournamentID = tournament_id
+
+
     @property
-    def paymentID(self):
-        return self.__paymentID
+    def payment_id(self):
+        return self.__payment_id
     @property
     def amount(self):
         return self.__amount
@@ -34,7 +24,6 @@ class Payment:
     @property
     def type(self):
         return self.__type  
-    def amount(self): return self.__amount
     @property
     def status(self):
         return self.__status
@@ -42,15 +31,12 @@ class Payment:
     def member(self):
         return self.__member
     @property
-    def tournamentID(self):
-        return self.__tournamentID
+    def tournament_id(self):
+        return self.__tournament_id
     @status.setter
     def status(self, new_status):
         self.__status = new_status
-    
-
-    def status(self): return self.__status
-    
+        
     def validate(self):
         # จำลองการยืนยันการชำระเงิน
         self.__status = PaymentStatus.SUCCESS

@@ -1,14 +1,41 @@
-from enum import Enum
 from models.score import Scorecard
 from models.enum import TournamentStatus
 from models.leaderboard import Leaderboard
 
+class MatchGroup:
+    def __init__(self, group_number: int, players: list, slot=None):
+        # เก็บหมายเลขกลุ่ม (เช่น กลุ่มที่ 1, 2, 3)
+        self.__group_number = group_number
+        # เก็บ List ของ Object Member ที่อยู่ในกลุ่มนี้
+        self.__players = players 
+        self.__slot = slot
+
+    @property
+    def group_number(self):
+        return self.__group_number
+
+    @property
+    def slot(self): return self.__slot
+
+    @slot.setter
+    def slot(self, data): self.__slot = data
+
+    @property
+    def players(self):
+        return self.__players
+
+    # ฟังก์ชันเสริมสำหรับแสดงข้อมูล 
+    def __str__(self):
+        player_names = ", ".join([p.name for p in self.__players])
+        return f"Group {self.__group_number}: {player_names}"
+    
+
 class Tournament:
     def __init__(self, tour_id, name, date, fee,course):
-        self.__tournamentID = tour_id
+        self.__id = tour_id
         self.__name = name
         self.__date = date
-        self.__entryFee = fee
+        self.__entry_fee = fee
         self.__course = course
         self.__status = TournamentStatus.REGISTRATION_OPEN
         self.__registered_players = [] # เก็บออบเจกต์ Member ที่จ่ายเงินแล้ว
@@ -16,25 +43,26 @@ class Tournament:
         self.__score_cards = []
         self.__reserved_slots = []
     @property
-    def id(self): return self.__tournamentID
+    def id(self): return self.__id
     
     @property
     def name(self): return self.__name
 
     @property
-    def entryFee(self): return self.__entryFee
+    def entry_fee(self): return self.__entry_fee
 
     @property
     def registered_players(self): return self.__registered_players
 
     @property
     def status(self): return self.__status
+
     @status.setter
     def status(self, new_status):
         self.__status = new_status
 
     @property
-    def matchBookings(self): return self.__matchBookings
+    def match_bookings(self): return self.__match_bookings
     
     @property
     def course(self): return self.__course
@@ -51,7 +79,7 @@ class Tournament:
     def set_to_completed(self):
         self.__status = TournamentStatus.COMPLETED
 
-    def updateStatus(self, status):
+    def update_status(self, status):
         self.__status = status
 
     def add_player(self, member):
@@ -60,8 +88,8 @@ class Tournament:
             self.__registered_players.append(member)           
             
             # 🌟 สร้าง Scorecard instance แล้ว .append() ใส่ List ตรงนี้จบเลย
-            new_scorecard = Scorecard(member, self.course)
-            self.__scorecards.append(new_scorecard)
+            new_scorecard = Scorecard(member, self.__course)
+            self.__score_cards.append(new_scorecard)
             return True
         return False
 
@@ -78,31 +106,22 @@ class Tournament:
 
     def record_player_score(self, member, hole_number, stroke):
         # 🌟 จุดแก้ที่ 4: เปลี่ยนจากการหาด้วย Key ใน Dict มาเป็นการวนลูปเปรียบเทียบ Instance
-        for sc in self.__scorecards:
+        for sc in self.__score_cards:
             if sc.member == member:  # เทียบออบเจกต์ Member ตรงๆ ได้เลย (เจ๋งตรงนี้แหละ OOP)
                 sc.record_score(hole_number, stroke)
                 return True
         return False
 
     def get_leaderboard(self):        
-        # 🌟 จุดแก้ที่ 5: self.scorecards เป็น List ของ Object อยู่แล้ว ส่งเข้าไปได้เลย!
-        board = Leaderboard(self.scorecards) 
+        # 🌟 จุดแก้ที่ 5: self.score_cards เป็น List ของ Object อยู่แล้ว ส่งเข้าไปได้เลย!
+        board = Leaderboard(self.score_cards) 
         return board.generate()
-    def add_scorecard(self, member, course):
-        """ให้ทัวร์นาเมนต์เป็นคนจัดการสร้างและเก็บ Scorecard เอง"""
-        # สมมติว่ามี self.__scorecards = {} อยู่ใน __init__
-        new_scorecard = Scorecard(member, course)
-        self.__scorecards[member.id] = new_scorecard
-        
-    def get_scorecard(self, member_id):
-        return self.__scorecards.get(member_id)
-        
-    def get_all_scorecards(self):
-        return list(self.__scorecards.values())
+
+    
     def get_scorecard_by_member_id(self, member_id):
         """วนลูปหาใบจดคะแนนใน List ตาม ID ของสมาชิก (คืนค่า Instance ของ Scorecard)"""
-        for sc in self.__scorecards:
+        for sc in self.__score_cards:
             # สมมติว่า Member ของคุณมี property ชื่อ ID (ถ้าชื่ออื่นเช่น member_id ให้แก้ด้วยนะครับ)
-            if sc.member.user_id == member_id: 
+            if sc.member.id == member_id: 
                 return sc
         return None

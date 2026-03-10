@@ -34,13 +34,29 @@ class TournamentStatus(Enum):
     REGISTRATION_OPEN = "REGISTRATION_OPEN"
     CLOSED = "CLOSED"
     DRAW_PUBLISHED = "DRAW_PUBLISHED"
+    IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
 
+# models/enum.py
 class Tier(Enum):
-    SILVER = "SILVER"
-    GOLD = "GOLD"
-    PLATINUM = "PLATINUM"
+    SILVER = 0.05    # เก็บค่า rate ไว้ที่นี่เลย
+    GOLD = 0.10
+    PLATINUM = 0.15
+    NONE = 0.0
 
+    @property
+    def discount_rate(self) -> float:
+        return self.value
+
+class Booking_day_limit(Enum):
+    SILVER = 7
+    GOLD = 14
+    PLATINUM = 30
+
+    @property
+    def day_limit(self) -> int:
+        return self.value
+    
 class UserStatus(Enum):
     ACTIVE = "ACTIVE"
     WEEKEND_BAN = "WEEKEND_BAN"
@@ -55,4 +71,8 @@ class CaddyLevel(str, Enum):
     TRAINEE = "TRAINEE"
     REGULAR = "REGULAR"
     PRO = "PRO"
-    VIP = "VIP"
+    
+class RainCheckStatus(Enum):
+    VALID = "VALID"
+    USED = "USED"
+    EXPIRED = "EXPIRED"

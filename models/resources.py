@@ -1,4 +1,3 @@
-from enum import Enum
 from datetime import datetime, timedelta
 from models.enum import BookingStatus, CaddyLevel, CartType
 
@@ -58,7 +57,7 @@ class Caddy:
         self.__name = name
         self.__level = level
         self.__price = price
-        self.__mySchedule = [] 
+        self.__my_schedule = [] 
 
     @property
     def id(self): 
@@ -78,7 +77,7 @@ class Caddy:
 
     def is_available(self, target_date: str, target_time: str) -> bool:
         target_dt = datetime.strptime(f"{target_date} {target_time}", "%d-%m-%Y %H:%M")
-        for b in self.__mySchedule:
+        for b in self.__my_schedule:
             if b.status == BookingStatus.CANCELLED: continue
             existing_dt = datetime.strptime(f"{b.slot.play_date} {b.slot.time}", "%d-%m-%Y %H:%M")
             time_diff = abs((target_dt - existing_dt).total_seconds()) / 3600
@@ -87,18 +86,18 @@ class Caddy:
         return True
 
     def assign_to_schedule(self, booking):
-        self.__mySchedule.append(booking)
+        self.__my_schedule.append(booking)
         
     def remove_from_schedule(self, booking):
-        if booking in self.__mySchedule:
-            self.__mySchedule.remove(booking)
+        if booking in self.__my_schedule:
+            self.__my_schedule.remove(booking)
 
 class GolfCart:
     def __init__(self, cart_id, cart_type: CartType, price):
         self.__id = cart_id
         self.__type = cart_type
         self.__price = price
-        self.__mySchedule = [] 
+        self.__my_schedule = [] 
 
     @property
     def id(self): return self.__id
@@ -109,7 +108,7 @@ class GolfCart:
 
     def is_available(self, target_date: str, target_time: str) -> bool:
         target_dt = datetime.strptime(f"{target_date} {target_time}", "%d-%m-%Y %H:%M")
-        for b in self.__mySchedule:
+        for b in self.__my_schedule:
             if b.status == BookingStatus.CANCELLED: continue
             existing_dt = datetime.strptime(f"{b.slot.play_date} {b.slot.time}", "%d-%m-%Y %H:%M")
             time_diff = abs((target_dt - existing_dt).total_seconds()) / 3600
@@ -118,8 +117,8 @@ class GolfCart:
         return True
 
     def assign_to_schedule(self, booking):
-        self.__mySchedule.append(booking)
+        self.__my_schedule.append(booking)
 
     def remove_from_schedule(self, booking):
-        if booking in self.__mySchedule:
-            self.__mySchedule.remove(booking)
+        if booking in self.__my_schedule:
+            self.__my_schedule.remove(booking)

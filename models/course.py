@@ -87,10 +87,10 @@ class Course:
             self.__holes.append(new_hole)
 
     def get_hole_par(self, number):
-        hole = self.__holes.get(number)
-        if hole:
-            return hole.par
-        raise ValueError(f"ไม่พบข้อมูลหลุมที่ {number} ในสนามนี้") # 🌟 ดัก Error ให้ชัดเจนขึ้นแทนการ return 0
+        for hole in self.__holes:
+            if hole.number == number: 
+                return hole.par
+        raise ValueError(f"ไม่พบข้อมูลหลุมที่ {number} ในสนามนี้")
 
     def get_hole_info(self, number):
         return self.__holes.get(number)

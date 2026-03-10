@@ -137,7 +137,7 @@ def view_all_tournaments():
         "date": t.date,
         "entry_fee": t.entry_fee,
         "status": t.status.value,
-        "registered_count": len(t.entries)
+        "registered_count": len(t.registered_players)
     } for t in sys.tournaments]
     return {"tournaments": t_list}
 

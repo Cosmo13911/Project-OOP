@@ -25,7 +25,7 @@ class Booking:
     @property
     def status(self): return self.__status
     @property
-    def caddy_assignments(self): return self.__caddy_assignments
+    def caddy (self): return self.__caddy
     @property
     def carts(self): return self.__carts
     @property
@@ -45,16 +45,35 @@ class Booking:
     def set_status(self, status: BookingStatus):
         self.__status = status
         
-    def assign_caddy(self, user_id, caddy: Caddy):
-        self.__caddy_assignments[user_id] = caddy
+    def assign_caddy(self, caddy: Caddy):
+        self.__caddy.append(caddy)
 
     def assign_cart(self, cart: GolfCart):
         self.__carts.append(cart)
         
     def clear_addons(self):
-        for caddy in self.__caddy_assignments.values():
+        for caddy in self.__caddy:
             caddy.remove_from_schedule(self)
         for cart in self.__carts:
             cart.remove_from_schedule(self)
-        self.__caddy_assignments.clear()
+        self.__caddy.clear()
         self.__carts.clear()
+
+    def calculate_total_price(self) -> float:
+        """
+        Method หลักในการคำนวณราคาสุทธิของทั้งการจอง
+        """
+        # 1. ราคาฐานจากสนาม (คำนวณตามช่วงเวลา)
+        base_price = self.__slot.course.get_price_by_time(self.__slot.time)
+        
+        # 2. คำนวณส่วนลด (Polymorphism: Member หรือ Guest จะคืนค่าต่างกัน)
+        # โดยที่ Booking ไม่ต้องรู้ logic ข้างในของ user เลย
+        discount = self.__requester.calculate_discount(base_price)
+        
+        # 3. รวมราคา Add-ons (เช่น Caddy, Cart, Orders)
+        # สมมติว่าแต่ละ Add-on object มี method .get_price()
+        addons_price = sum(addon.price for addon in self.get_all_addons)
+        
+        # ยอดสุทธิ
+        total = (base_price - discount) + addons_price
+        return round(total, 2)
