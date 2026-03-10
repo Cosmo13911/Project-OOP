@@ -113,8 +113,8 @@ def select_booking_addons(
         # 4. ล้างค่าเดิมก่อนเริ่มการจองใหม่ (Encapsulation Principle)
         booking.clear_addons()
 
-        raw_date = booking.get_slot.get_play_date 
-        time = booking.get_slot.get_time
+        raw_date = booking.slot.get_play_date 
+        time = booking.slot.time
 
         # 2. แปลงจาก YYYY-MM-DD เป็น DD-MM-YYYY สำหรับ Add-ons Module
         # เพื่อให้ Module อื่นๆ นำไปใช้งานได้ตาม format ที่คาดหวัง
