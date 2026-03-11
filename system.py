@@ -12,6 +12,7 @@ from models.payment import Payment, PaymentStatus
 
 
 class GreenValleySystem:
+
     MAX_GOLFERS_PER_GROUP = 4
 
     def __init__(self):
@@ -33,6 +34,20 @@ class GreenValleySystem:
     def bookings(self): return self.__bookings
     @property
     def tournaments(self): return self.__tournaments
+    
+# กำหนด Format ที่เป็นไปได้ทั้งหมด
+    DATE_FORMATS = ["%d-%m-%Y", "%Y-%m-%d"] 
+    DATETIME_FORMATS = ["%d-%m-%Y %H:%M", "%Y-%m-%d %H:%M"]
+
+    # สร้างฟังก์ชันกลางในการแปลงวันที่ (Robust Parsing)
+    def robust_parse_datetime(self, dt_str):
+        for fmt in self.DATETIME_FORMATS:
+            try:
+                return datetime.strptime(dt_str, fmt)
+            except ValueError:
+                continue
+        raise ValueError(f"ไม่รองรับรูปแบบเวลา: {dt_str} กรุณาใช้ DD-MM-YYYY HH:MM หรือ YYYY-MM-DD HH:MM")
+    
     @property
     def get_all_courses(self): return self.__courses
     @property
@@ -236,9 +251,7 @@ class GreenValleySystem:
 
     def check_booking_lead_time(self, user, date_str: str):
         now = datetime.now().date()
-        
-        target_date = datetime.strptime(date_str, "%d-%m-%Y").date()
-        if not target_date: raise ValueError("Invalid date format. Use DD-MM-YYYY.")
+        target_date = self.parse_date(date_str)
 
         # กรณี Guest (Walk-in)
         if isinstance(user, Guest):
@@ -254,12 +267,16 @@ class GreenValleySystem:
             raise ValueError(f"{user.name} ({user.tier.name}) can only book up to {limit} days in advance. You tried to book {diff_days} days ahead.")
         
     def check_5_hour_rule(self, identifier: str, new_date: str, new_time: str):
-        new_dt = datetime.strptime(f"{new_date} {new_time}", "%d-%m-%Y %H:%M")
         
+        target_dt = self.robust_parse_datetime(f"{new_date} {new_time}")
+        std_new_date = target_dt.strftime("%d-%m-%Y")
+        
+        new_dt = self.parse_datetime(new_date, new_time)     
+           
         for b in self.__bookings:
             # 📌 กรองเฉพาะคิวที่ไม่ได้ยกเลิก และ "จองในวันเดียวกัน" จะได้ทำงานเร็วขึ้น
-            if b.status.value != "CANCELLED" and b.slot.play_date == new_date:
-                existing_dt = datetime.strptime(f"{b.slot.play_date} {b.slot.time}", "%d-%m-%Y %H:%M")
+            if b.status.value != "CANCELLED" and b.slot.play_date == std_new_date:
+                existing_dt = self.robust_parse_datetime(f"{b.slot.play_date} {b.slot.time}")
                 time_diff = abs((new_dt - existing_dt).total_seconds()) / 3600
                 
                 if time_diff < 5:
@@ -270,6 +287,9 @@ class GreenValleySystem:
         return True # ผ่าน
     
     def create_booking(self, requester_id: str, course_id: str, date: str, time: str, companion_ids: list = None):
+        std_date_obj = self.robust_parse_datetime(f"{date} {time}")
+        standardized_date = std_date_obj.strftime("%d-%m-%Y")
+        
         if companion_ids is None:
             companion_ids = []
             
@@ -295,7 +315,7 @@ class GreenValleySystem:
             else: raise ValueError(f"Companion with ID {c_id} not found")
 
         # 3. ค้นหาและตรวจสอบ Slot
-        slot = course.find_slot(date, time)
+        slot = course.find_slot(standardized_date, time)
         if not slot or slot.status != SlotStatus.AVAILABLE:
             raise ValueError(f"Slot {time} on {date} is not available for course {course.name}")
 
