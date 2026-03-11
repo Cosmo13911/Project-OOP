@@ -116,6 +116,11 @@ def place_order(booking_id: str, product_id: str, quantity: int):
 @mcp.tool()
 def create_golf_booking(member_id: str, course_id: str, date: str, time: str, companions: list[str] = None):
     """ใช้จองเวลาออกรอบสนามกอล์ฟ (รองรับเพื่อนร่วมก๊วน และล็อก Slot ทันที)"""
+    """
+    สร้างการจองสนามกอล์ฟใหม่
+    :param date: วันที่ต้องการจอง **ต้องใช้รูปแบบ DD-MM-YYYY เท่านั้น** (เช่น 12-03-2026)
+    :param time: เวลาที่ต้องการจอง รูปแบบ HH:MM (เช่น 08:00)
+    """
     try:
         # เรียกใช้ create_booking ที่มีการจำกัด 4 คนและล็อก Slot
         new_booking = sys.create_booking(member_id, course_id, date, time, companions)
@@ -133,85 +138,78 @@ def select_booking_addons(
     specific_caddies: List[str],
     random_caddy_level: Optional[str],
     random_caddy_count: int,
-    cart_type: Optional[str] ,cart_count: int
+    cart_type: Optional[str],
+    cart_count: int
 ) -> str:
     """
-    เครื่องมือสำหรับจัดการ Add-ons (แคดดี้และรถกอล์ฟ) ให้กับการจองที่ระบุ 
-    พร้อมตรวจสอบกฎธุรกิจ 1 ผู้เล่นต่อ 1 แคดดี้ และสถานะว่างของทรัพยากร
+    เครื่องมือสำหรับจัดการ Add-ons (แคดดี้และรถกอล์ฟ) ให้กับการจอง
     """
     try:
-        # 1. การตรวจสอบความถูกต้องเบื้องต้น (Input Validation)
         booking = sys.find_booking(booking_id)
         if not booking:
             raise ValueError(f"Error: ไม่พบข้อมูลการจองรหัส {booking_id}")
 
-        # 2. ตรวจสอบสิทธิ์ (Business Rule: Guest ห้ามระบุแคดดี้)
-        if isinstance(booking.requester, Guest) and len(specific_caddies) > 0:
-            raise ValueError ("Error: ลูกค้าทั่วไป (Guest) ไม่สามารถระบุตัวแคดดี้ได้ ต้องใช้ระบบสุ่มเท่านั้น")
-
-        # 3. ตรวจสอบกฎเหล็ก 1:1 (Business Rule Validation)
+        # ตรวจสอบกฎเหล็ก 1:1
         total_golfers = len(booking.golfers)
         total_requested_caddies = len(specific_caddies) + random_caddy_count
         
         if total_requested_caddies != total_golfers:
-            raise ValueError (f"Error: จำนวนแคดดี้ไม่ถูกต้อง ก๊วนนี้มี {total_golfers} คน ต้องจองแคดดี้ให้ครบ {total_golfers} ท่าน")
+            raise ValueError(f"Error: จำนวนแคดดี้ไม่ถูกต้อง ก๊วนนี้มี {total_golfers} คน ต้องจองแคดดี้ให้ครบ {total_golfers} ท่าน")
 
-        # 4. ล้างค่าเดิมก่อนเริ่มการจองใหม่ (Encapsulation Principle)
         booking.clear_addons()
 
+        # --- แก้ไขจุดที่ 1: ใช้ Robust Parsing เพื่อความ Consistency ---
         raw_date = booking.slot.play_date 
         time = booking.slot.time
-
-        # 2. แปลงจาก YYYY-MM-DD เป็น DD-MM-YYYY สำหรับ Add-ons Module
-        # เพื่อให้ Module อื่นๆ นำไปใช้งานได้ตาม format ที่คาดหวัง
-        try:
-            date_obj = datetime.strptime(raw_date, "%Y-%m-%d")
-            date = date_obj.strftime("%d-%m-%Y")
-        except ValueError as e:
-            # เพิ่ม Error Handling ตามเกณฑ์ [cite: 19, 20]
-            return f"System Error: รูปแบบวันที่ในระบบไม่ถูกต้อง - {str(e)}"
         
-        assigned_details = []
-        # date, time = booking.slot.play_date, booking.slot.time
-        available_caddies = sys.find_available_caddies(date, time)
-        available_carts = sys.find_available_carts(date, time)
-        if not available_caddies and total_requested_caddies :
-            raise ValueError("Error: No caddies available for the selected time slot or No carts available for the selected time slot")
+        #Normalization: แปลงให้เป็นมาตรฐาน DD-MM-YYYY ก่อนส่งเข้า System
+        dt_obj = sys.robust_parse_datetime(f"{raw_date} {time}")
+        std_date = dt_obj.strftime("%d-%m-%Y") 
+        # ---------------------------------------------------------
 
-        # 5. การจัดการระบุแคดดี้ (Specific Assignment)
+        assigned_details = []
+        available_caddies = sys.find_available_caddies(std_date, time)
+        available_carts = sys.find_available_carts(std_date, time)
+
+        # จัดการระบุแคดดี้
         for idx, c_id in enumerate(specific_caddies):
             golfer = booking.golfers[idx]
             caddy = next((c for c in available_caddies if c.id == c_id), None)
             if not caddy:
-                raise ValueError (f"Error: แคดดี้รหัส {c_id} ไม่ว่างหรือไม่มีข้อมูล")
+                raise ValueError(f"Error: แคดดี้รหัส {c_id} ไม่ว่างหรือไม่มีข้อมูล")
             
-            # Polymorphism & Association
             booking.assign_caddy(caddy)
             caddy.assign_to_schedule(booking)
             available_caddies.remove(caddy)
             assigned_details.append(f"{golfer.name} -> แคดดี้: {caddy.name}")
 
-        # 6. การจัดการสุ่มแคดดี้ (Random Assignment)
+        # จัดการสุ่มแคดดี้
         start_idx = len(specific_caddies)
-        if random_caddy_level and random_caddy_count > 0:
+        if random_caddy_count > 0:
             for i in range(random_caddy_count):
                 golfer = booking.golfers[start_idx + i]
-                # กรองระดับแคดดี้
-                caddy = next((c for c in available_caddies if c.level.value == random_caddy_level), None)
+                # กรองระดับแคดดี้ (ถ้าไม่ได้ระบุเลเวล ให้สุ่มจากที่ว่างทั้งหมด)
+                if random_caddy_level:
+                    caddy = next((c for c in available_caddies if c.level.value == random_caddy_level), None)
+                else:
+                    caddy = available_caddies[0] if available_caddies else None
+
                 if not caddy:
-                    raise ValueError  (f"Error: แคดดี้ระดับ {random_caddy_level} ว่างไม่เพียงพอ")
+                    raise ValueError(f"Error: แคดดี้ว่างไม่เพียงพอ")
                 
-                booking.assign_caddy(golfer.id, caddy)
+                # --- แก้ไขจุดที่ 2: ส่งเฉพาะ caddy ตามที่คลาส Booking กำหนด ---
+                booking.assign_caddy(caddy) 
+                # ---------------------------------------------------------
                 caddy.assign_to_schedule(booking)
                 available_caddies.remove(caddy)
                 assigned_details.append(f"{golfer.name} -> แคดดี้: {caddy.name} (สุ่ม)")
 
-        # 7. การจัดการรถกอล์ฟ (Resource Management)
+        # จัดการรถกอล์ฟ
         if cart_type and cart_count > 0:
             for _ in range(cart_count):
                 cart = next((c for c in available_carts if c.type.value == cart_type), None)
                 if not cart:
-                    raise ValueError (f"Error: รถกอล์ฟประเภท {cart_type} ว่างไม่เพียงพอ")
+                    raise ValueError(f"Error: รถกอล์ฟประเภท {cart_type} ว่างไม่เพียงพอ")
                 
                 booking.assign_cart(cart)
                 cart.assign_to_schedule(booking)
@@ -221,6 +219,7 @@ def select_booking_addons(
         return f"ยืนยัน Add-ons สำเร็จสำหรับ {booking_id}:\n" + "\n".join(assigned_details)
 
     except Exception as e:
+        # Error Handling: ส่งข้อความ Error กลับไปหา User อย่างชัดเจน
         return f"System Error: เกิดข้อผิดพลาดทางเทคนิค - {str(e)}"
 @mcp.tool()
 def view_transaction(booking_id: str):
