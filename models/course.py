@@ -1,4 +1,4 @@
-from models.enum import SlotStatus
+from models.enum import SlotStatus, TournamentStatus
 class Hole:
     def __init__(self, number: int, par: int):
         self.__number = number

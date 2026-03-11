@@ -162,33 +162,6 @@ class GreenValleySystem:
         # 4. จำลองการจอง (Transaction Class [cite: 8])
         # ต้องมีสถานะติดตาม (PENDING, CONFIRMED, CANCELLED) อย่างน้อย 3 สถานะ [cite: 12]
 
-        
-        # รายการที่ 1: Jennie (M-001) จองสนาม C-001
-        b1 = self.create_booking("M-001", "C-001", "20-03-2026", "08:00")
-        # เพิ่มแคดดี้ (น้องฝ้าย CDY-003)
-        caddy1 = self.find_available_caddies("20-03-2026", "08:00")[2] 
-        b1.assign_caddy(caddy1)
-
-        # รายการที่ 2: Praw (M-002) จองสนาม C-002 พร้อมเพื่อน 1 คน
-        b2 = self.create_booking("M-002", "C-002", "21-03-2026", "09:30", ["M-003"])
-        # เพิ่มรถกอล์ฟ VIP
-        cart1 = self.find_available_carts("21-03-2026", "09:30")[0]
-        b2.assign_cart(cart1)
-            
-
-
-        # ===============================================
-        # 5. จำลองทัวร์นาเมนต์ (Tournament Simulation) - ไว้ล่างสุดลบง่าย
-        # ===============================================
-    
-        # สร้างรายการแข่ง "Green Valley Open 2026"
-        self.create_tournament(
-            name="Green Valley Open 2026", 
-            date="25-03-2026", 
-            fee=1500.0, 
-            course_id="C-001"
-        )
-
 
     def add_member(self, name, phone, tier: Tier,handicap: float = 0.0):
         new_id = f"M-{len(self.__users) + 1:03d}"
@@ -394,7 +367,7 @@ class GreenValleySystem:
         new_order.add_item(OrderItem(product, quantity))
         
         booking.add_order(new_order)
-        net_total = new_order.calculate_net_total
+        net_total = new_order.price
 
         if isinstance(booking.requester, Member):
             booking.requester.add_notification(Notification(f"Order placed: {quantity}x {product.name}. Total: {net_total} THB)"))
@@ -449,7 +422,9 @@ class GreenValleySystem:
         
     def close_registration_and_pairing(self, tour_id):
         tour = self.find_tournament(tour_id)
-        tour.update_status(TournamentStatus.CLOSED)
+        if not tour:
+            raise ValueError("Tournament not found")
+        tour.update_status(TournamentStatus.DRAW_PUBLISHED)
         
         pairings = tour.generate_pairing() # ได้ list ของ match_group
         course = tour.course 
@@ -489,7 +464,7 @@ class GreenValleySystem:
             self.bookings.append(new_booking)
             tour.match_bookings.append(new_booking)
 
-        tour.update_status(TournamentStatus.DRAW_PUBLISHED)
+        tour.update_status(TournamentStatus.IN_PROGRESS)
         return f"Draw Published. {len(pairings)} groups assigned with tee times."
 
 

@@ -96,7 +96,7 @@ def view_bookings():
         
         bookings_list.append({
             "id": b.booking_id, 
-            # "name": b.requester.id, 
+            "name": b.requester.id, 
             "price": total_price, 
             "slot": b.slot.time, 
             "status": b.status.value, 
@@ -458,14 +458,14 @@ def admin_publish_draw(tour_id: str):
         result = sys.close_registration_and_pairing(tour_id)
         return {"message": result}
     except Exception as e:
-        return {"error": str(e)}
+        return {"errsdjfdsfoisjfojor": str(e)}
 
 @mcp.tool()
 def admin_start_tournament(tour_id: str):
     """[Admin Only] เริ่มการแข่งขันอย่างเป็นทางการ"""
     try:
         tour = sys.find_tournament(tour_id)
-        tour.update_status(TournamentStatus.IN_PROGRESS)
+        tour.status(TournamentStatus.IN_PROGRESS)
         return {"message": f"Tournament {tour.name} has started!"}
     except Exception as e:
         return {"error": str(e)}

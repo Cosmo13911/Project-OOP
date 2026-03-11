@@ -1,5 +1,5 @@
 from datetime import datetime
-from models.enum import PaymentStatus, RainCheckStatus
+from models.enum import PaymentStatus, RainCheckStatus, TournamentStatus
 
 class Payment:
     def __init__(self, amount, member, transaction = None, booking_id=None, tournament_id=None):

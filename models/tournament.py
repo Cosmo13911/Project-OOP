@@ -57,8 +57,8 @@ class Tournament:
     @property
     def status(self): return self.__status
 
-    @status.setter
-    def status(self, new_status):
+    
+    def update_status(self, new_status):
         self.__status = new_status
 
     @property

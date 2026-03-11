@@ -1,5 +1,5 @@
 # Project-OOP/models/score.py
-
+from models.enum import SlotStatus, TournamentStatus
 class ScoreRecord:
     def __init__(self, hole_number: int, stroke: int):
         self.__hole_number = hole_number

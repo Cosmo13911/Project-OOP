@@ -1,6 +1,7 @@
 from datetime import datetime
-from models.enum import BookingStatus
+from models.enum import BookingStatus, TournamentStatus
 from models.resources import Caddy, GolfCart
+
 
 class Booking:
     def __init__(self, booking_id, requester, slot):
