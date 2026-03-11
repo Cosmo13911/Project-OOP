@@ -8,14 +8,13 @@ class Hole:
     def par(self):
         return self.__par
     
-    def get_hole_par(self, number):
-        hole = self.__holes.get(number)
-        if hole:
-            return hole.par
-        raise ValueError(f"ไม่พบข้อมูลหลุมที่ {number} ในสนามนี้") # 🌟 ดัก Error ให้ชัดเจนขึ้นแทนการ return 0
+    @property
+    def number(self):  
+        return self.__number
 
-    def get_hole_info(self, number):
-        return self.__holes.get(number)
+    @property
+    def par(self):
+        return self.__par
 
 class Course:
     def __init__(self, course_id, name, fee_morning, fee_afternoon, course_type, rating, slope_rating, open_time="06:00", close_time="18:00"):
@@ -81,20 +80,27 @@ class Course:
         return None
     
     def add_hole(self, number: int, par: int):
-        # สร้าง Object Hole ภายในคลาส (Composition)
+        # ตรวจสอบก่อนเพิ่มเพื่อป้องกันเลขหลุมซ้ำ (Guard Clause)
+        if any(h.number == number for h in self.__holes):
+            return
+        
         if len(self.__holes) < 18:
             new_hole = Hole(number, par)
             self.__holes.append(new_hole)
 
-    def get_hole_par(self, number):
+    def get_hole_par(self, number: int):
+        # วนลูปหาหลุมที่หมายเลขตรงกันใน List ของ Hole objects
         for hole in self.__holes:
-            if hole.number == number: 
+            if hole.number == number:
                 return hole.par
         raise ValueError(f"ไม่พบข้อมูลหลุมที่ {number} ในสนามนี้")
-
-    def get_hole_info(self, number):
-        return self.__holes.get(number)
-
+    
+    def get_hole_info(self, number: int):
+        # วนลูปหาเพื่อคืนค่า Object Hole ทั้งใบ
+        for hole in self.__holes:
+            if hole.number == number:
+                return hole
+        return None
 
 class TeeTimeSlot:
     def __init__(self, play_date, time, course):
