@@ -527,7 +527,8 @@ def issue_rain_check(user_id: str, amount: float) -> str:
 
 @mcp.tool()
 def get_user_rainchecks(user_id: str):
-    """เครื่องมือสำหรับดึงข้อมูล Rain Check ทั้งหมดของผู้ใช้รายนั้น (สำหรับตรวจสอบสถานะและมูลค่า)"""
+    #test
+    """เครื่องมือสำหรับดึงข้อมูล Rain Check ทั้งหมดของผู้ใช้รายนั้น (สำหรับตรวจสอบสถานะและมูลค่า) """
     try:
         user = sys.find_user(user_id)
         if not user:
