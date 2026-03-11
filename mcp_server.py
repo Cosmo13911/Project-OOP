@@ -401,16 +401,30 @@ def view_tournaments():
 #         # กรณีไม่พบ user_id หรือ tour_id ระบบจะ raise error จาก find_user/find_tournament
 #         return {"error": str(e)}
 
+    
 @mcp.tool()
-def register_tournament(member_id: str, tour_id: str):
-    """สมัครเข้าแข่งขันและชำระเงินค่าธรรมเนียมทัวร์นาเมนต์ทันที"""
+def apply_for_tournament(member_id: str, tour_id: str):
+    """ใช้สมัครทัวร์นาเมนต์เพื่อจองสิทธิ์ไว้ก่อน (ยังไม่ต้องจ่ายเงินทันที)"""
     try:
-        # เรียกใช้เมธอดที่เราเพิ่งเพิ่มใน system.py
-        result = sys.process_registration_payment(member_id, tour_id)
-        return result
+        p_id = sys.register_tournament_pending(member_id, tour_id)
+        return {
+            "status": "PENDING",
+            "payment_id": p_id,
+            "message": "สมัครสำเร็จ! กรุณาชำระเงินโดยใช้รหัส Payment ID นี้"
+        }
     except Exception as e:
         return {"error": str(e)}
-    
+
+@mcp.tool()
+def pay_tournament_fee(payment_id: str):
+    """ยืนยันการชำระเงินสำหรับทัวร์นาเมนต์ที่สมัครไว้"""
+    try:
+        if sys.confirm_tournament_payment(payment_id):
+            return {"status": "SUCCESS", "message": "ชำระเงินเรียบร้อย สิทธิ์การแข่งของคุณยืนยันแล้ว"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @mcp.tool()
 def view_my_notifications(member_id: str):
     """ดูการแจ้งเตือนส่วนตัวของสมาชิก (เช่น ยืนยันการจอง/การจ่ายเงิน)"""

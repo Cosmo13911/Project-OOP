@@ -25,7 +25,10 @@ class Payment:
     def get_transaction_details(self):
         return self.__transaction
         
-
+    @property
+    def tournament_id(self):
+        return self.__tournament_id
+    
 class Raincheck:
         def __init__(self, code: str, amount: float, phone: str):
             self.__code = code

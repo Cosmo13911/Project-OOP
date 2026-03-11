@@ -494,6 +494,47 @@ class GreenValleySystem:
             "leaderboard": tour.get_leaderboard()
         }
     
+    # เพิ่มใน system.py
+    def register_tournament_pending(self, member_id: str, tour_id: str):
+        tour = self.find_tournament(tour_id)
+        member = self.find_user(member_id)
+        
+        # Validation: เช็คว่าสมัครซ้ำไหม หรือทัวร์เต็ม/ปิดหรือยัง
+        if any(m.id == member_id for m in tour.registered_players):
+            raise ValueError("คุณได้สมัครทัวร์นาเมนต์นี้ไปแล้ว")
+            
+        # สร้างรายการชำระเงินแบบ PENDING
+        payment = Payment(
+            amount=tour.entry_fee, 
+            member=member, 
+            tournament_id=tour.id
+        )
+        payment.set_status(PaymentStatus.PENDING) # สำคัญ: ตั้งเป็นรอดำเนินการ
+        self.__payments.append(payment)
+        
+        # เพิ่มชื่อเข้าทัวร์นาเมนต์ (ชื่อจะไปปรากฏในระบบแล้ว แต่สถานะการเงินยังไม่ Success)
+        tour.add_player(member) 
+        
+        member.add_notification(Notification(f"สมัคร {tour.name} สำเร็จ! กรุณาชำระเงิน {tour.entry_fee} บาท เพื่อยืนยันสิทธิ์"))
+        
+        return payment.payment_id
+    
+    # เพิ่มใน system.py
+    def confirm_tournament_payment(self, payment_id: str):
+        # ค้นหารายการ Payment จาก ID
+        payment = next((p for p in self.__payments if p.payment_id == payment_id), None)
+        
+        if not payment:
+            raise ValueError("ไม่พบรายการชำระเงินนี้")
+            
+        # เปลี่ยนสถานะเป็นสำเร็จ
+        payment.set_status(PaymentStatus.SUCCESS)
+        
+        # แจ้งเตือนผู้ใช้
+        payment.member.add_notification(Notification(f"ชำระเงินค่าสมัครทัวร์นาเมนต์ {payment.tournament_id} เรียบร้อยแล้ว!"))
+        
+        return True 
+    
     # เพิ่มลงในคลาส GreenValleySystem ในไฟล์ system.py
     def process_registration_payment(self, member_id: str, tour_id: str):
         """จัดการชำระเงินค่าสมัครทัวร์นาเมนต์และเพิ่มชื่อผู้เข้าแข่งขัน"""
