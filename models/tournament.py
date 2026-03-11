@@ -79,9 +79,6 @@ class Tournament:
     def set_to_completed(self):
         self.__status = TournamentStatus.COMPLETED
 
-    def update_status(self, status):
-        self.__status = status
-
     def add_player(self, member):
         # member คือ Instance ของ Member
         if member not in self.__registered_players:

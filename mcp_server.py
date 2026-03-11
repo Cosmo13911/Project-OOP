@@ -18,9 +18,24 @@ sys.create_data()
 # ==========================================
 # หมวด User & Ordering (Booking & Products)
 # ==========================================
-
 @mcp.tool()
-def pay_booking(booking_id: str):
+def view_rain_checks(rain_check_code: str):
+    """ตรวจสอบรายการ Rain Check (คูปองคืนเงิน) ที่ผูกกับเบอร์โทรศัพท์"""
+    try:
+        # กรองข้อมูลจาก property rain_check
+        vouchers = [
+            {
+                "code": v.code, 
+                "amount": v.amount, 
+                "status": v.status.value
+            } for v in sys.find_raincheck(rain_check_code)
+        ]
+        return {"rain_check_code": rain_check_code, "vouchers": vouchers}
+    except Exception as e:
+        return {"error": str(e)}
+    
+@mcp.tool()
+def pay_booking(booking_id: str, rain_check_code : Optional[str] = None):
     """
     ยืนยันการชำระเงินสำหรับการจองสนาม 
     เมื่อสำเร็จจะเปลี่ยนสถานะ Booking เป็น CONFIRMED
@@ -30,13 +45,14 @@ def pay_booking(booking_id: str):
         booking = sys.find_booking(booking_id)
         if not booking:
             return {"error": f"ไม่พบข้อมูลการจองรหัส {booking_id}"}
+        
+        rain_check_code = rain_check_code if rain_check_code else None
 
         # 4. ดำเนินการชำระเงิน (เรียกใช้ process_payment ใน system)
-        payment_result = sys.process_payment(booking)
+        payment_result = sys.process_payment(booking = booking, rain_check_code = rain_check_code)
         
         # 5. อัปเดตสถานะการจองเป็น CONFIRMED (ถ้าชำระเงินสำเร็จ)
         if "successfully" in payment_result:
-            booking.set_statusc_confirmed() # สมมติว่ามี method นี้ใน model booking
             return {
                 "message": f"ชำระเงินสำหรับการจอง {booking_id} สำเร็จ!",
                 "payment_details": payment_result,
@@ -72,7 +88,7 @@ def view_payment_history(user_id: str):
 @mcp.tool()
 def view_bookings(): 
     bookings_list = [
-        {"id": b.booking_id, "name": b.requester.id, "price": b.calculate_total_price, "slot": b.slot.time, "status": b.status.value, "addons": b.get_all_addons, "orders": b.orders} 
+        {"id": b.booking_id, "name": b.requester.id, "price": b.calculate_total_price()[0], "slot": b.slot.time, "status": b.status.value, "addons": b.get_all_addons, "orders": b.orders, "Transaction": b.calculate_total_price()[1]} 
         for b in sys.bookings
     ]
     return {"booking": bookings_list}
@@ -206,6 +222,22 @@ def select_booking_addons(
 
     except Exception as e:
         return f"System Error: เกิดข้อผิดพลาดทางเทคนิค - {str(e)}"
+@mcp.tool()
+def view_transaction(booking_id: str):
+    """ดูรายละเอียดการคำนวณราคาสุทธิของการจอง รวมถึงส่วนประกอบต่างๆ ที่นำมาคิดราคา"""
+    try:
+        booking = sys.find_booking(booking_id)
+        if not booking:
+            return {"error": f"ไม่พบข้อมูลการจองรหัส {booking_id}"}
+        
+        total_price, breakdown = booking.calculate_total_price()
+        return {
+            "booking_id": booking_id,
+            "total_price": total_price,
+            "price_breakdown": breakdown
+        }
+    except Exception as e:
+        return {"error": str(e)}
     
 @mcp.tool()
 def view_all_caddies():
@@ -477,11 +509,11 @@ def issue_rain_check(user_id: str, amount: float) -> str:
     try:
         # 1. Validation เบื้องต้นตามกฎธุรกิจ (Business Rule) [cite: 99]
         if amount <= 0:
-            return "Error: มูลค่าของ Rain Check ต้องมากกว่า 0 บาท"
+            raise ValueError("Error: มูลค่าของ Rain Check ต้องมากกว่า 0 บาท")
 
         # 2. เรียกใช้งาน Method จาก GreenValleySystem
         new_rc = sys.issue_raincheck_to_user(user_id, amount)
-        
+
         if new_rc:
             # คืนค่าเป็น String เพื่อให้ AI นำไปแจ้งผู้ใช้ต่อได้
             return (f"ออกคูปองสำเร็จ!\n"
@@ -489,13 +521,30 @@ def issue_rain_check(user_id: str, amount: float) -> str:
                     f"มูลค่า: {new_rc.amount:,.2f} บาท\n"
                     f"ผูกกับเบอร์โทรศัพท์: {new_rc.phone}")
         else:
-            return "Error: ไม่สามารถออกคูปองได้ (ผู้ใช้อาจไม่ใช่ Golfer หรือไม่พบข้อมูล)"
+            raise ValueError("Error: ไม่สามารถออกคูปองได้ (ผู้ใช้อาจไม่ใช่ Golfer หรือไม่พบข้อมูล)")
 
-    except ValueError as e:
-        # Error Handling ตามเกณฑ์ข้อ 1.19 [cite: 19, 99]
-        return f"Fail: {str(e)}"
     except Exception as e:
         return f"System Error: เกิดข้อผิดพลาดทางเทคนิค - {str(e)}"
 
+@mcp.tool()
+def get_user_rainchecks(user_id: str):
+    """เครื่องมือสำหรับดึงข้อมูล Rain Check ทั้งหมดของผู้ใช้รายนั้น (สำหรับตรวจสอบสถานะและมูลค่า)"""
+    try:
+        user = sys.find_user(user_id)
+        if not user:
+            raise ValueError("ไม่พบผู้ใช้งาน") 
+        
+        # กรองข้อมูล Rain Check ที่ผูกกับเบอร์โทรศัพท์ของผู้ใช้
+        rainchecks = [
+            {
+                "code": rc.code,
+                "amount": rc.amount,
+                "status": rc.status.value
+            } for rc in sys.rain_check if rc.phone == user.phone
+        ]
+        return {"user": user.name, "rainchecks": rainchecks}
+    except Exception as e:
+        return {"error": str(e)}
+    
 if __name__ == "__main__":
     mcp.run()

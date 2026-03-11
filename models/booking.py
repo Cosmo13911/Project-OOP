@@ -63,8 +63,7 @@ class Booking:
         self.__caddy.clear()
         self.__carts.clear()
 
-    @property
-    def calculate_total_price(self) -> float:
+    def calculate_total_price(self, rain_check = None) -> float:
         """
         Method หลักในการคำนวณราคาสุทธิของทั้งการจอง
         """
@@ -81,4 +80,19 @@ class Booking:
         
         # ยอดสุทธิ
         total = (base_price - discount) + addons_price
-        return round(total, 2)
+
+        rc_value = rain_check.value if rain_check is not None else 0
+        
+        total -= rc_value
+        
+        msg = {
+            "base_price": round(base_price, 2),
+            "discount": round(discount, 2),
+            "addons_price": round(addons_price, 2),
+            "rain_check_coupon": round(rc_value, 2),
+            "total_net": round(total, 2),
+            "currency": "THB"
+        }
+
+        
+        return round(total, 2), msg

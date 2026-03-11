@@ -4,6 +4,7 @@ class BookingStatus(Enum):
     PENDING_PAYMENT = "PENDING_PAYMENT"
     CONFIRMED_PAID = "CONFIRMED_PAID"   
     CANCELLED = "CANCELLED"
+    RAIN_CHECK_ISSUED = "RAIN_CHECK_ISSUED"
 
 class CourseType(str, Enum):
     CHAMPIONSHIP = "CHAMPIONSHIP"
@@ -12,9 +13,6 @@ class CourseType(str, Enum):
 class SlotStatus(str, Enum):
     AVAILABLE = "AVAILABLE"
     RESERVED = "RESERVED"
-
-class PaymentType(Enum):
-    TOURNAMENT_FEE = "TOURNAMENT_FEE"
 
 class PaymentStatus(Enum):
     PENDING = "PENDING"

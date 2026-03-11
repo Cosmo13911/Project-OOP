@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from models.enum import Tier, UserStatus
 from models.notification import Notification
 from datetime import timedelta , datetime
+from models.payment import Raincheck
 
 class History:
     def __init__(self, sc__score_card_instance, round_type="GENERAL"):
@@ -66,15 +67,32 @@ class Golfer(User):
         super().__init__(user_id, name, phone)
         self.__current_handicap = handicap
         self.__history = []
+        self.__strikes = 0
+        self.__raincheck = []
     @property
     def current_handicap(self): return self.__current_handicap
     @property
     def history(self):
         return self.__history
+    @property
+    def get_raincheck(self):
+        return self.__raincheck
+
+    def add_raincheck(self, rain_check):
+        self.__raincheck.append(rain_check)
+    
+    def add_srike(self, number: int):
+        self.__strikes += number
+        now = datetime.now()
+        if self.__strikes == 2:
+            self.__weekend_ban_until = now + timedelta(days=30)
+            self.__status = UserStatus.WEEKEND_BAN
+        elif self.__strikes >= 3:
+            self.__suspended_until = now + timedelta(days=60)
+            self.__status = UserStatus.BANNED
 
     # 🌟 ฟังก์ชันเสริม: เอาไว้รับคะแนนจาก sc__score_card มาใส่ประวัติ
     def add_history(self, sc__score_card_instance, round_type="General"):
-
         new_record = History(sc__score_card_instance)
 
         self.__history.append(new_record)

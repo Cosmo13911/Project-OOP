@@ -40,9 +40,9 @@ class GreenValleySystem:
     @property
     def carts(self): return self.__carts
     @property
-    def rain_check(self): return self.__rain_check
+    def rain_checks(self): return self.__rain_checks
     @property
-    def payment (self): return self.__payments    
+    def payments(self): return self.__payments
 
     def create_data(self):
         # 1. สร้างกลุ่มผู้ใช้ (Actors อย่างน้อย 2 กลุ่ม ตามข้อกำหนด [cite: 24])
@@ -212,7 +212,7 @@ class GreenValleySystem:
     def find_booking_by_member(self, member_id: str):
         for booking in self.__bookings:
             if booking.requester.id == member_id:
-                return booking.booking_id
+                return booking
         raise ValueError(f"Booking with ID {member_id} not found")
 
     def find_product(self, product_id: str):
@@ -231,6 +231,9 @@ class GreenValleySystem:
     def find_payment_by_id(self, paymentID):
         return next((p for p in self.__payments if p.payment_id == paymentID), None)
 
+    def find_raincheck(self, rain_check_code: str):
+        return next((rc for rc in self.__rain_checks if rc.code == rain_check_code), None)
+    
     def get_course_by_type(self, course_type):
         return next((c for c in self.__courses if c.type == course_type), None)
 
@@ -361,18 +364,31 @@ class GreenValleySystem:
         self.__tournaments.append(new_tour)
         return {"tournamentID": t_id, "course_assigned": course.name}
 
-    def process_payment(self, booking: Booking):
+    def process_payment(self, booking: Booking, tour: Tournament = None, member: Member = None, rain_check_code: str = None):
         # 1. แยกส่วนประกอบของรหัส Payment        
-        try:    
-            member = self.find_user(booking.requester.id)
-            if not member:
-                raise ValueError(f"Member with ID {booking.requester.id} not found")
-            
-            payment = Payment(booking.calculate_total_price, member, booking_id=booking.booking_id)
+        try:
+            if tour and member:
+                payment = Payment(tour.entry_fee, member, tournament_id=tour.tournament_id)
+
+            else:
+                member = self.find_user(booking.requester.id)
+                if not member:
+                    raise ValueError(f"Member with ID {booking.requester.id} not found")
+                
+                if rain_check_code:
+                    rain_check = self.find_raincheck(rain_check_code)
+                    if not rain_check:
+                        raise ValueError(f"Rain Check with code {rain_check_code} not found")
+                else:
+                    rain_check = None
+
+                total_price , msg = booking.calculate_total_price(rain_check)
+                payment = Payment(total_price, member, booking_id=booking.booking_id, transaction=msg)
+                booking.set_status(BookingStatus.CONFIRMED_PAID)
+
             payment.set_status(PaymentStatus.SUCCESS)
             self.__payments.append(payment)
 
-            booking.set_status(BookingStatus.CONFIRMED_PAID)
             
             # [เพิ่ม] การแจ้งเตือนการชำระเงินเสร็จสิ้น
             msg = f"Payment Successful! [{payment.get_type}] is confirmed."
@@ -472,22 +488,15 @@ class GreenValleySystem:
             raise ValueError("Already registered for this tournament.")
 
         # 3. ตรวจสอบสถานะ Tournament (ต้องเปิดรับสมัครอยู่)
-        from models.enum import TournamentStatus
         if tour.status != TournamentStatus.REGISTRATION_OPEN:
             raise ValueError(f"Tournament registration is {tour.status.value}")
 
-        # 4. สร้างการชำระเงิน (Payment) จริงลงในระบบ
-        from models.payment import Payment, PaymentStatus
-        from models.notification import Notification
-
-        # สร้าง Payment สำหรับ Tournament
         new_payment = Payment(
             amount=tour.entry_fee, 
             member=member, 
             booking_id=f"TOUR-{tour_id}"
         )
-        new_payment.set_status(PaymentStatus.SUCCESS) 
-        self.payment.append(new_payment) # บันทึกลงในรายการ payments ของระบบ
+        self.process_payment(tour_id, member_id) # เรียกใช้ method process_payment เพื่อจัดการชำระเงิน
 
         # 5. เพิ่มสมาชิกเข้าทัวร์นาเมนต์ (จะไปสร้าง Scorecard ให้อัตโนมัติใน models/tournament.py)
         tour.add_player(member)
@@ -533,9 +542,16 @@ class GreenValleySystem:
         }
 
     def issue_raincheck_to_user(self, user_id: str, amount: float): #✔️
-        user = self.find_user_by_id(user_id)
-        if not user : raise ValueError("Not found user id")
+        user = self.find_user(user_id)
+        if not user : 
+            raise ValueError("Not found user id")
+
+        booking = self.find_booking_by_member(user_id) # สมมติว่ามี method นี้เพื่อเช็คว่าผู้ใช้มีการจองที่เกี่ยวข้องหรือไม่
+        if not booking:
+            raise ValueError("Error: ผู้ใช้ไม่พบหรือไม่ได้ทำการจอง")
         
+        booking.set_status(BookingStatus.RAIN_CHECK_ISSUED)
+
         if user and isinstance(user, Golfer):
             auto_code = f"RC-{len(self.__rain_checks) + 1:04d}-{user_id}"
             # ดึงเบอร์จาก User เพื่อให้ code ผูกติดกับเบอร์
