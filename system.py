@@ -290,24 +290,22 @@ class GreenValleySystem:
         return True # ผ่าน
     
     def create_booking(self, requester_id: str, course_id: str, date: str, time: str, companion_ids: list = None):
-        std_date_obj = self.robust_parse_datetime(f"{date} {time}")
-        standardized_date = std_date_obj.strftime("%d-%m-%Y")
-        
         if companion_ids is None:
             companion_ids = []
             
-        # 1. Validation: ตรวจสอบจำนวนคนในก๊วน (รวมคนจองต้องไม่เกิน 4)
-        total_golfers = 1 + len(companion_ids)
-        if total_golfers > self.MAX_GOLFERS_PER_GROUP:
-            raise ValueError(f"1 Group can have at most {self.MAX_GOLFERS_PER_GROUP} golfers (including requester). You have {total_golfers}.")
+        # 1. Normalization: แปลงวันที่ให้เป็นมาตรฐานเดียวกันก่อนทำงาน 
+        dt_obj = self.robust_parse_datetime(f"{date} {time}")
+        std_date = dt_obj.strftime("%d-%m-%Y")
+
+        # 2. Validation: ตรวจสอบจำนวนคนในก๊วน (รวมคนจองต้องไม่เกิน 4) 
+        total_golfers_count = 1 + len(companion_ids)
+        if total_golfers_count > self.MAX_GOLFERS_PER_GROUP:
+            raise ValueError(f"1 Group can have at most {self.MAX_GOLFERS_PER_GROUP} golfers. You have {total_golfers_count}.")
 
         requester = self.find_user(requester_id)
-        if not requester:
-            raise ValueError(f"Requester with ID {requester_id} not found")
         course = self.find_course(course_id)
-        if not course:
-            raise ValueError(f"Course with ID {course_id} not found")
-        # 2. ค้นหาสมาชิกคนอื่นๆ ในก๊วน
+
+        # 3. ค้นหาสมาชิกคนอื่นๆ ในก๊วน
         companions = []
         for c_id in companion_ids:
             comp = self.find_user(c_id)
@@ -315,33 +313,30 @@ class GreenValleySystem:
                 if comp == requester:
                     raise ValueError("Requester cannot be a companion to themselves.")
                 companions.append(comp)
-            else: raise ValueError(f"Companion with ID {c_id} not found")
 
-        # 3. ค้นหาและตรวจสอบ Slot
-        slot = course.find_slot(standardized_date, time)
+        # 4. ตรวจสอบ Slot ด้วยวันที่มาตรฐาน
+        slot = course.find_slot(std_date, time)
         if not slot or slot.status != SlotStatus.AVAILABLE:
-            raise ValueError(f"Slot {time} on {date} is not available for course {course.name}")
+            raise ValueError(f"Slot {time} on {std_date} is not available.")
 
-        # 4. สร้างการจองและล็อก Slot ทันที (Locking Logic)
+        # 5. สร้างการจองและล็อก Slot
         b_id = f"BK-{len(self.__bookings) + 1:03d}"
         new_booking = Booking(b_id, requester, slot)
         
-        # เพิ่มเพื่อนร่วมก๊วนเข้าไปใน Booking Object
-        # (ตรวจสอบว่าในคลาส Booking มี Method add_golfers หรือยัง)
-        new_booking.add_golfer(companions)
+        # เพิ่มเพื่อนร่วมก๊วนเข้าไป (ตรวจสอบว่าส่ง list ของ object เข้าไป)
+        for companion in companions:
+            new_booking.add_golfer(companion)
 
-        # 5. เปลี่ยนสถานะ Slot เป็น RESERVED ทันทีเพื่อล็อกก๊วน
-        # ตามเกณฑ์ข้อ 1.15 การเปลี่ยนสถานะถือเป็นการติดตามสถานะทรัพยากร
         slot.status = SlotStatus.RESERVED 
 
-        # 6. แจ้งเตือนทุกคนในก๊วน (Notification - ข้อ 1.20)
+                # 6. แจ้งเตือนทุกคนในก๊วน (Notification - ข้อ 1.20)
         all_players = [requester] + companions
         for player in all_players:
             player.add_notification(Notification(f"Booking id: {b_id}, Course {course.name}, Slot time : {slot.time}"))
 
         self.__bookings.append(new_booking)
         return new_booking
-
+    
     # ---------------- Ordering ----------------
     def place_order(self, booking_id: str, product_id: str, quantity: int):
     
@@ -351,6 +346,9 @@ class GreenValleySystem:
         booking = self.find_booking(booking_id)
         if not booking:
             raise KeyError(f"Booking ID {booking_id} not found")
+
+        if booking.status == BookingStatus.CONFIRMED_PAID:
+                raise ValueError("Cannot place order: This booking has already been paid.")
 
         product = self.find_product(product_id)
         if not product:
