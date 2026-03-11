@@ -69,8 +69,8 @@ class GreenValleySystem:
         # walk in na ja
         caddy_data = [
             ("พี่แนน (Pro)", CaddyLevel.PRO, 600),
-            ("น้องฝ้าย (Regular)", CaddyLevel.REGULAR, 450),
             ("พี่นุ่น (Pro)", CaddyLevel.PRO, 600),
+            ("น้องฝ้าย (Regular)", CaddyLevel.REGULAR, 450),
             ("น้องโบว์ (Regular)", CaddyLevel.REGULAR, 450),
             ("สมชาย (Trainee)", CaddyLevel.TRAINEE, 350),
             ("สมศรี (Trainee)", CaddyLevel.TRAINEE, 350),

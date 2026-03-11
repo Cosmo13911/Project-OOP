@@ -14,7 +14,7 @@ def run_system_test():
     
     # 2. ทดสอบการดูข้อมูล User (Entity Class ต้องมี ID) [cite: 10, 11]
     print("\n[1] user in system:")
-    users = system.get_all_users # Method ใน Controller
+    users = system.users # Method ใน Controller
     for u in users:
         print(f"ID: {u.id} | Name: {u.name} | Tier: {u.tier}")
 
@@ -24,7 +24,7 @@ def run_system_test():
         print(f"Course: {course.name} ({course.type})")
 
     print("\n[3] Products (Limited Quantity):")
-    for prod in system.get_all_products:
+    for prod in system.products:
         print(f"Product: {prod.name} | Price: {prod.price} | Remaining: {prod.stock}")
 
     print("\n--- Phase B: Booking Operations (Logic Test) ---")
@@ -32,6 +32,8 @@ def run_system_test():
     # Scenario: Jennie (M-001) จองสนาม Championship ช่วงเช้า
     print("[4] Booking for Jennie...")
     booking1 = system.create_booking("M-001", "C-001", "2026-03-10", "08:00")
+    print(f"testsssssssss {len(booking1.golfers)}")
+    print(f"testsssssssss {(booking1.golfers)}")
     if not booking1: print("Booking failed for Jennie.")
     for noti in jennie.get_notifications:
         print(f"{noti.time} | Notification for Jennie: {noti.message}")    

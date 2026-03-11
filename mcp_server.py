@@ -68,19 +68,24 @@ def view_payment_history(user_id: str):
         return {"user": user.name, "payment_history": history}
     except Exception as e:
         return {"error": str(e)}
-    
+
+@mcp.tool()
+def view_bookings(): 
+    bookings_list = [
+        {"id": b.booking_id, "name": b.requester.id, "price": b.calculate_total_price, "slot": b.slot.time, "status": b.status.value, "addons": b.get_all_addons, "orders": b.orders} 
+        for b in sys.bookings
+    ]
+    return {"booking": bookings_list}
+
 @mcp.tool()
 def view_products():
-    """ใช้ดูรายการสินค้าทั้งหมดในระบบ พร้อมราคาและสต็อกที่เหลือ"""
-    try:
         # เรียกใช้ p.id, p.name, p.price แบบ property ตาม system.py
-        products_list = [
-            {"id": p.id, "name": p.name, "price": p.price, "remaining_stock": p.stock} 
-            for p in sys.products
-        ]
-        return {"products": products_list}
-    except Exception as e:
-        return {"error": str(e)}
+    products_list = [
+        {"id": p.id, "name": p.name, "price": p.price, "remaining_stock": p.stock} 
+        for p in sys.products
+    ]
+    return {"products": products_list}
+ 
 
 @mcp.tool()
 def place_order(booking_id: str, product_id: str, quantity: int):
@@ -165,7 +170,7 @@ def select_booking_addons(
                 raise ValueError (f"Error: แคดดี้รหัส {c_id} ไม่ว่างหรือไม่มีข้อมูล")
             
             # Polymorphism & Association
-            booking.assign_caddy(golfer.user_id, caddy)
+            booking.assign_caddy(caddy)
             caddy.assign_to_schedule(booking)
             available_caddies.remove(caddy)
             assigned_details.append(f"{golfer.name} -> แคดดี้: {caddy.name}")
@@ -180,7 +185,7 @@ def select_booking_addons(
                 if not caddy:
                     raise ValueError  (f"Error: แคดดี้ระดับ {random_caddy_level} ว่างไม่เพียงพอ")
                 
-                booking.assign_caddy(golfer.user_id, caddy)
+                booking.assign_caddy(golfer.id, caddy)
                 caddy.assign_to_schedule(booking)
                 available_caddies.remove(caddy)
                 assigned_details.append(f"{golfer.name} -> แคดดี้: {caddy.name} (สุ่ม)")

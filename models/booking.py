@@ -21,7 +21,11 @@ class Booking:
     @property
     def slot(self): return self.__slot
     @property
-    def golfers(self): return self.__golfers
+    def golfers(self): 
+        for golfer in self.__golfers:
+            if golfer == []:
+                self.__golfers.remove(golfer)
+        return self.__golfers
     @property
     def status(self): return self.__status
     @property
