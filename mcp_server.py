@@ -76,10 +76,10 @@ def view_payment_history(user_id: str):
             # กรองเฉพาะ payment ที่เกี่ยวข้องกับ user นี้ (ตรวจสอบจาก ID หรือข้อมูลอ้างอิง)
             if user_id in p.id: 
                 history.append({
-                    "payment_id": p.id,
+                    "payment_id": p.payment_id,
                     "amount": p.amount,
                     "status": p.status.value,
-                    "date": p.timestamp
+                    "date": p.time
                 })
         return {"user": user.name, "payment_history": history}
     except Exception as e:
@@ -96,7 +96,7 @@ def view_bookings():
         
         bookings_list.append({
             "id": b.booking_id, 
-            "name": b.requester.id, 
+            # "name": b.requester.id, 
             "price": total_price, 
             "slot": b.slot.time, 
             "status": b.status.value, 

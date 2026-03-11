@@ -416,7 +416,7 @@ class GreenValleySystem:
         # 1. แยกส่วนประกอบของรหัส Payment        
         try:
             if tour and member:
-                payment = Payment(tour.entry_fee, member, tournament_id=tour.tournament_id)
+                payment = Payment(tour.entry_fee, member, tournament_id=tour.id)
 
             else:
                 member = self.find_user(booking.requester.id)
@@ -524,38 +524,33 @@ class GreenValleySystem:
             "leaderboard": tour.get_leaderboard()
         }
     
-    # เพิ่มลงในคลาส GreenValleySystem ในไฟล์ system.py
+    # เพิ่มลงในคลาส GreenValleySystem ในไฟล์ system.py-
     def process_registration_payment(self, member_id: str, tour_id: str):
         """จัดการชำระเงินค่าสมัครทัวร์นาเมนต์และเพิ่มชื่อผู้เข้าแข่งขัน"""
-        # 1. ค้นหาข้อมูล Tournament และ Member
+        # 1. Find Tournament and Member objects
         tour = self.find_tournament(tour_id)
         member = self.find_user(member_id)
 
-        # 2. ตรวจสอบว่าเคยสมัครไปหรือยัง (ใช้ .id เพื่อเปรียบเทียบ)
+        # 2. Check if already registered
         if any(entry.id == member.id for entry in tour.registered_players):
             raise ValueError("Already registered for this tournament.")
 
-        # 3. ตรวจสอบสถานะ Tournament (ต้องเปิดรับสมัครอยู่)
+        # 3. Check Tournament status
         if tour.status != TournamentStatus.REGISTRATION_OPEN:
             raise ValueError(f"Tournament registration is {tour.status.value}")
 
-        new_payment = Payment(
-            amount=tour.entry_fee, 
-            member=member, 
-            booking_id=f"TOUR-{tour_id}"
-        )
-        self.process_payment(tour_id, member_id) # เรียกใช้ method process_payment เพื่อจัดการชำระเงิน
+        # --- FIX: Pass arguments as keywords to bypass the 'booking' positional argument ---
+        # This prevents the "'str' object has no attribute 'requester'" error
+        self.process_payment(booking=None, tour=tour, member=member) 
 
-        # 5. เพิ่มสมาชิกเข้าทัวร์นาเมนต์ (จะไปสร้าง Scorecard ให้อัตโนมัติใน models/tournament.py)
+        # 5. Add player to tournament
         tour.add_player(member)
 
-        # 6. แจ้งเตือนสมาชิก
+        # 6. Notify the member
         msg = f"Payment Successful for {tour.name}. Amount: {tour.entry_fee} THB"
         member.add_notification(Notification(msg))
 
         return {
-            "paymentID": new_payment.payment_id,
-            "amount": tour.entry_fee,
             "status": "SUCCESS",
             "message": msg
         }

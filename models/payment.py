@@ -11,10 +11,16 @@ class Payment:
         self.__type = "TOURNAMENT" if tournament_id else "BOOKING"
         self.__status = PaymentStatus.PENDING
         self.__transaction = transaction
+        self.__time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     @property
     def payment_id(self): return self.__payment_id
-
+    @property
+    def amount(self): return self.__amount
+    @property
+    def status(self): return self.__status
+    @property
+    def time(self): return self.__time
     @property
     def get_type(self):
         return self.__type
