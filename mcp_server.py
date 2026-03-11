@@ -72,7 +72,7 @@ def view_payment_history(user_id: str):
             return {"error": "ไม่พบผู้ใช้งาน"}
             
         history = []
-        for p in sys.get_payments():
+        for p in sys.payments:
             # กรองเฉพาะ payment ที่เกี่ยวข้องกับ user นี้ (ตรวจสอบจาก ID หรือข้อมูลอ้างอิง)
             if user_id in p.id: 
                 history.append({
@@ -87,10 +87,23 @@ def view_payment_history(user_id: str):
 
 @mcp.tool()
 def view_bookings(): 
-    bookings_list = [
-        {"id": b.booking_id, "name": b.requester.id, "price": b.calculate_total_price()[0], "slot": b.slot.time, "status": b.status.value, "addons": b.get_all_addons, "orders": b.orders, "Transaction": b.calculate_total_price()[1]} 
-        for b in sys.bookings
-    ]
+    """ดูรายการจองทั้งหมด พร้อมรายละเอียดราคาและสถานะ"""
+    bookings_list = []
+    for b in sys.bookings:
+        # เรียกใช้โดยไม่ต้องส่ง rain_check (เพราะใน view ปกติจะยังไม่มีการใช้คูปอง)
+        # ตรวจสอบให้แน่ใจว่าใน booking.py กำหนด def calculate_total_price(self, rain_check=None):
+        total_price, breakdown = b.calculate_total_price() 
+        
+        bookings_list.append({
+            "id": b.booking_id, 
+            "name": b.requester.id, 
+            "price": total_price, 
+            "slot": b.slot.time, 
+            "status": b.status.value, 
+            "addons": [str(addon) for addon in b.get_all_addons], # แปลงเป็น string เพื่อให้ JSON อ่านง่าย
+            "orders": len(b.orders), 
+            "Transaction": breakdown
+        })
     return {"booking": bookings_list}
 
 @mcp.tool()
@@ -179,8 +192,12 @@ def select_booking_addons(
         if random_caddy_count > 0:
             for i in range(random_caddy_count):
                 golfer = booking.golfers[start_idx + i]
-                # กรองระดับแคดดี้
-                caddy = next((c for c in available_caddies if not random_caddy_level or c.level.value == random_caddy_level), None)
+                # กรองระดับแคดดี้ (ถ้าไม่ได้ระบุเลเวล ให้สุ่มจากที่ว่างทั้งหมด)
+                if random_caddy_level:
+                    caddy = next((c for c in available_caddies if c.level.value == random_caddy_level), None)
+                else:
+                    caddy = available_caddies[0] if available_caddies else None
+
                 if not caddy:
                     raise ValueError(f"Error: แคดดี้ว่างไม่เพียงพอ")
                 
@@ -257,22 +274,7 @@ def view_all_golf_carts():
         return {"total": len(cart_list), "carts": cart_list}
     except Exception as e:
         return {"error": str(e)}
-    
-@mcp.tool()
-def view_rain_checks(phone: str):
-    """ตรวจสอบรายการ Rain Check (คูปองคืนเงิน) ที่ผูกกับเบอร์โทรศัพท์"""
-    try:
-        # กรองข้อมูลจาก property rain_check
-        vouchers = [
-            {
-                "code": v.code, 
-                "amount": v.amount, 
-                "status": v.status.value
-            } for v in sys.rain_check if v.phone == phone
-        ]
-        return {"phone": phone, "vouchers": vouchers}
-    except Exception as e:
-        return {"error": str(e)}
+
 
 @mcp.tool()
 def admin_view_all_payments():
@@ -284,7 +286,7 @@ def admin_view_all_payments():
                 "payment_id": p.payment_id, 
                 "status": "SUCCESS", # หรือดึงจากสถานะจริงใน object
                 "amount": getattr(p, 'amount', 0)
-            } for p in sys.payment
+            } for p in sys.payments
         ]
         return {"total_transactions": len(payment_history), "history": payment_history}
     except Exception as e:

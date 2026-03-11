@@ -81,7 +81,7 @@ class Booking:
         # ยอดสุทธิ
         total = (base_price - discount) + addons_price
 
-        rc_value = rain_check.value if rain_check is not None else 0
+        rc_value = rain_check.amount if rain_check is not None else 0
         
         total -= rc_value
         
