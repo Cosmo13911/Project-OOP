@@ -1,6 +1,7 @@
 from datetime import datetime
-from models.enum import BookingStatus
+from models.enum import BookingStatus, TournamentStatus
 from models.resources import Caddy, GolfCart
+
 
 class Booking:
     def __init__(self, booking_id, requester, slot):
@@ -63,7 +64,7 @@ class Booking:
         self.__caddy.clear()
         self.__carts.clear()
 
-    def calculate_total_price(self, rain_check = None) -> float:
+    def calculate_total_price(self, rain_check_amount=None):
         """
         Method หลักในการคำนวณราคาสุทธิของทั้งการจอง
         """
@@ -81,15 +82,14 @@ class Booking:
         # ยอดสุทธิ
         total = (base_price - discount) + addons_price
 
-        rc_value = rain_check.amount if rain_check is not None else 0
-        
-        total -= rc_value
-        
+        rc = float(rain_check_amount) if rain_check_amount is not None else 0.0
+        total -= rc
+
         msg = {
             "base_price": round(base_price, 2),
             "discount": round(discount, 2),
             "addons_price": round(addons_price, 2),
-            "rain_check_coupon": round(rc_value, 2),
+            "rain_check_coupon": round(rc, 2),
             "total_net": round(total, 2),
             "currency": "THB"
         }

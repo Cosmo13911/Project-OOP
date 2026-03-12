@@ -1,3 +1,4 @@
+from models.enum import SlotStatus, TournamentStatus
 class LeaderboardEntry:
     def __init__(self, rank_no, member_name, handicap, gross_score, net_score, to_par):
         self.__rank_no = rank_no

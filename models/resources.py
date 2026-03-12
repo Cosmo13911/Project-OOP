@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from models.enum import BookingStatus, CaddyLevel, CartType
+from models.enum import BookingStatus, CaddyLevel, CartType, TournamentStatus
 
 class Product:
     def __init__(self, p_id, name, price, stock):
@@ -31,7 +31,7 @@ class OrderItem:
 
     @property
     def total_price(self):
-        return self.__product.price * self.__quantity
+        return float(self.__product.price) * int(self.__quantity)
 
 class Order:
     def __init__(self, order_id, buyer):
@@ -42,7 +42,7 @@ class Order:
     @property
     def items(self): return self.__items
     @property
-    def calculate_net_total(self):
+    def price(self):
         # มี Logic การคำนวณส่วนลด จึงคงไว้เป็น Method
         sub_total = sum(item.total_price for item in self.__items)
         discount = self.__buyer.calculate_discount(sub_total)
@@ -76,7 +76,7 @@ class Caddy:
         return self.__price
 
     def is_available(self, target_date: str, target_time: str) -> bool:
-        target_dt = datetime.strptime(f"{target_date} {target_time}", "%d-%m-%Y %H:%M")
+        target_dt = datetime.time(f"{target_date} {target_time}", "%d-%m-%Y %H:%M")
         for b in self.__my_schedule:
             if b.status == BookingStatus.CANCELLED: continue
             existing_dt = datetime.strptime(f"{b.slot.play_date} {b.slot.time}", "%d-%m-%Y %H:%M")

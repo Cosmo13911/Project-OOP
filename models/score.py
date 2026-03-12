@@ -1,5 +1,5 @@
 # Project-OOP/models/score.py
-
+from models.enum import SlotStatus, TournamentStatus
 class ScoreRecord:
     def __init__(self, hole_number: int, stroke: int):
         self.__hole_number = hole_number
@@ -17,7 +17,6 @@ class Scorecard:
     def __init__(self, member, course):
         self.__member = member
         self.__course = course
-        # เปลี่ยนจาก {} เป็น [] เพื่อเก็บ ScoreRecord objects
         self.__scores = [] 
 
     @property

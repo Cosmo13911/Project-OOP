@@ -76,10 +76,10 @@ def view_payment_history(user_id: str):
             # กรองเฉพาะ payment ที่เกี่ยวข้องกับ user นี้ (ตรวจสอบจาก ID หรือข้อมูลอ้างอิง)
             if user_id in p.id: 
                 history.append({
-                    "payment_id": p.id,
+                    "payment_id": p.payment_id,
                     "amount": p.amount,
                     "status": p.status.value,
-                    "date": p.timestamp
+                    "date": p.time
                 })
         return {"user": user.name, "payment_history": history}
     except Exception as e:
@@ -463,14 +463,14 @@ def admin_publish_draw(tour_id: str):
         result = sys.close_registration_and_pairing(tour_id)
         return {"message": result}
     except Exception as e:
-        return {"error": str(e)}
+        return {"errsdjfdsfoisjfojor": str(e)}
 
 @mcp.tool()
 def admin_start_tournament(tour_id: str):
     """[Admin Only] เริ่มการแข่งขันอย่างเป็นทางการ"""
     try:
         tour = sys.find_tournament(tour_id)
-        tour.update_status(TournamentStatus.IN_PROGRESS)
+        tour.status(TournamentStatus.IN_PROGRESS)
         return {"message": f"Tournament {tour.name} has started!"}
     except Exception as e:
         return {"error": str(e)}
@@ -503,16 +503,16 @@ def admin_end_tournament(tour_id: str):
         return {"error": str(e)}
 
 @mcp.tool()
-def issue_rain_check(user_id: str, amount: float) -> str:
+def issue_rain_check(user_id: str) -> str:
     """
     เครื่องมือสำหรับออกคูปอง Rain Check ให้แก่ผู้เล่น (Golfer) 
     ระบบจะสร้างรหัสคูปองอัตโนมัติและส่งการแจ้งเตือนหากเป็นสมาชิก (Member)
     """
     try:
-        # 1. Validation เบื้องต้นตามกฎธุรกิจ (Business Rule) [cite: 99]
-        if amount <= 0:
-            raise ValueError("Error: มูลค่าของ Rain Check ต้องมากกว่า 0 บาท")
-
+        booking = sys.find_booking_by_member(user_id) # สมมติว่ามี method นี้เพื่อเช็คว่าผู้ใช้มีการจองที่เกี่ยวข้องหรือไม่
+        if not booking:
+            raise ValueError("Error: ผู้ใช้ไม่พบหรือไม่ได้ทำการจอง")
+        amount = booking.calculate_total_price() * 0.5 # สมมติว่าให้คูปองมูลค่า 50% ของราคาสุทธิการจอง
         # 2. เรียกใช้งาน Method จาก GreenValleySystem
         new_rc = sys.issue_raincheck_to_user(user_id, amount)
 
