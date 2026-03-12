@@ -76,7 +76,7 @@ class Caddy:
         return self.__price
 
     def is_available(self, target_date: str, target_time: str) -> bool:
-        target_dt = datetime.time(f"{target_date} {target_time}", "%d-%m-%Y %H:%M")
+        target_dt = datetime.strptime(f"{target_date} {target_time}", "%d-%m-%Y %H:%M")
         for b in self.__my_schedule:
             if b.status == BookingStatus.CANCELLED: continue
             existing_dt = datetime.strptime(f"{b.slot.play_date} {b.slot.time}", "%d-%m-%Y %H:%M")

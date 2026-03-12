@@ -260,6 +260,23 @@ def view_all_caddies():
         return {"error": str(e)}
 
 @mcp.tool()
+def view_all_available_caddies(date: str, time: str):
+    """ตรวจสอบรายชื่อแคดดี้ที่ว่างในวันที่และเวลาที่ระบุ (สำหรับการจอง)"""
+    try:
+        available_caddies = sys.find_available_caddies(date, time)
+        caddy_list = [
+            {
+                "id": c.id, 
+                "name": c.name, 
+                "level": c.level.value, 
+                "price": c.price
+            } for c in available_caddies
+        ]
+        return {"date": date, "time": time, "available_caddies": caddy_list}
+    except Exception as e:
+        return {"error": str(e)}
+
+@mcp.tool()
 def view_all_golf_carts():
     """แสดงรายการรถกอล์ฟทั้งหมด พร้อมประเภทและราคาเช่า"""
     try:

@@ -71,6 +71,8 @@ class GreenValleySystem:
             ("M-006", "Jisoo", "081-666-6666", Tier.SILVER),
             ("M-007", "Rose", "081-777-7777", Tier.PLATINUM),
             ("M-008", "BamBam", "081-888-8888", Tier.GOLD)
+
+            
         ]
 
         product_data = [

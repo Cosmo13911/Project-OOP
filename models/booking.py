@@ -68,31 +68,40 @@ class Booking:
         """
         Method หลักในการคำนวณราคาสุทธิของทั้งการจอง
         """
-        # 1. ราคาฐานจากสนาม (คำนวณตามช่วงเวลา)
-        base_price = self.__slot.course.get_price_by_time(self.__slot.time)
-        
-        # 2. คำนวณส่วนลด (Polymorphism: Member หรือ Guest จะคืนค่าต่างกัน)
-        # โดยที่ Booking ไม่ต้องรู้ logic ข้างในของ user เลย
-        discount = self.__requester.calculate_discount(base_price)
-        
-        # 3. รวมราคา Add-ons (เช่น Caddy, Cart, Orders)
-        # สมมติว่าแต่ละ Add-on object มี method .get_price()
+
+        price_per_person = self.__slot.course.get_price_by_time(self.__slot.time)
+    
+        total_course_fee = 0.0
+        details_msg = []
+
+        # 2. วนลูปคำนวณราคาของนักกอล์ฟแต่ละคนตาม Tier ของเขา 
+        for golfer in self.golfers:
+            # คำนวณส่วนลดรายบุคคล (Polymorphism) 
+            individual_discount = golfer.calculate_discount(price_per_person)
+            net_person_price = price_per_person - individual_discount
+            total_course_fee += net_person_price
+            
+            # เก็บรายละเอียดไว้แสดงใน Transaction 
+            details_msg.append(f"{golfer.name} ({getattr(golfer, 'tier', 'GUEST')}): {net_person_price:,.2f} THB")
+            
+        # 3. รวมราคา Add-ons (Caddy, Cart, Orders)
         addons_price = sum(addon.price for addon in self.get_all_addons)
         
-        # ยอดสุทธิ
-        total = (base_price - discount) + addons_price
-
+        # 4. ยอดสุทธิรวมที่ผู้จองต้องจ่าย
+        total = total_course_fee + addons_price
+        
+        # หักลบ Rain Check (ถ้ามี)
         rc = float(rain_check_amount) if rain_check_amount is not None else 0.0
         total -= rc
 
         msg = {
-            "base_price": round(base_price, 2),
-            "discount": round(discount, 2),
-            "addons_price": round(addons_price, 2),
-            "rain_check_coupon": round(rc, 2),
-            "total_net": round(total, 2),
-            "currency": "THB"
-        }
-
-        
+                "base_price_per_person": round(price_per_person, 2),
+                "individual_breakdown": details_msg,
+                "total_course_fee": round(total_course_fee, 2),
+                "addons_price": round(addons_price, 2),
+                "rain_check_coupon": round(rc, 2),
+                "total_net_to_pay": round(total, 2), # ผู้จองจ่ายยอดนี้ยอดเดียว
+                "currency": "THB"
+            }
+    
         return round(total, 2), msg
