@@ -433,6 +433,7 @@ def apply_for_tournament(member_id: str, tour_id: str):
         }
     except Exception as e:
         return {"error": str(e)}
+    
 
 @mcp.tool()
 def pay_tournament_fee(payment_id: str):

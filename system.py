@@ -3,7 +3,7 @@ from models.tournament import Tournament
 from models.course import Course
 from models.resources import Product, Order, OrderItem, CartType, Caddy, CaddyLevel , GolfCart
 from models.booking import Booking
-from models.enum import SlotStatus, BookingStatus, TournamentStatus, Tier, CourseType, RainCheckStatus
+from models.enum import SlotStatus, BookingStatus, TournamentStatus, Tier, CourseType, RainCheckStatus , UserStatus
 from models.notification import Notification
 import random 
 from models.payment import Raincheck, RainCheckStatus
@@ -62,7 +62,7 @@ class GreenValleySystem:
     def create_data(self):
         # 1. สร้างกลุ่มผู้ใช้ (Actors อย่างน้อย 2 กลุ่ม ตามข้อกำหนด [cite: 24])
         # ประกอบด้วย Jennie, Praw, Rewthai, Tonkla และคนอื่นๆ รวม 8 คน
-        user_data = [
+        member_data = [
             ("M-001", "Jennie", "081-111-1111", Tier.PLATINUM),
             ("M-002", "Praw", "081-222-2222", Tier.PLATINUM),
             ("M-003", "Rewthai", "081-333-3333", Tier.PLATINUM),
@@ -72,7 +72,12 @@ class GreenValleySystem:
             ("M-007", "Rose", "081-777-7777", Tier.PLATINUM),
             ("M-008", "BamBam", "081-888-8888", Tier.GOLD)
 
-            
+        ]
+
+        guest_data = [
+            ("G-001", "Somchai Guest", "089-999-9999"),
+            ("G-002", "Somsak Guest", "089-888-8888"),
+            ("G-003", "Somying Guest", "089-777-7777")
         ]
 
         product_data = [
@@ -101,9 +106,13 @@ class GreenValleySystem:
         ]
         # สร้างสมาชิกที่มี Strike
 
-        for u_id, name, phone, tier in user_data:
+        for u_id, name, phone, tier in member_data:
             # ทุก attribute ใน Member ต้องเป็น private 
             self.__users.append(Member(u_id, name, phone, tier))
+
+        for g_id, name, phone in guest_data:
+        # ใช้คลาส Guest ตามที่ import มาจาก models.users
+            self.users.append(Guest(g_id, name, phone))
 
         for name, level, fee in caddy_data:
             self.add_caddy(name, level, fee)
@@ -593,9 +602,21 @@ class GreenValleySystem:
     
     # เพิ่มใน system.py
     def register_tournament_pending(self, member_id: str, tour_id: str):
+        
         tour = self.find_tournament(tour_id)
         member = self.find_user(member_id)
         
+        user = self.find_user(member_id) # เปลี่ยนชื่อตัวแปรให้สื่อความหมายกว้างขึ้น
+    
+        # 1. ตรวจสอบว่าเป็น Guest หรือไม่ (Guest ห้ามสมัคร)
+        if isinstance(user, Guest):
+            raise ValueError(f"ข้อผิดพลาด: Guest ({user.name}) ไม่สามารถสมัครทัวร์นาเมนต์ได้ สิทธิ์นี้เฉพาะสมาชิกเท่านั้น")
+        
+        # 2. ตรวจสอบสถานะการโดนแบน (Member ที่สถานะไม่ใช่ ACTIVE ห้ามสมัคร)
+        # อ้างอิงจากสถานะใน models/users.py และ models/enum.py
+        if hasattr(user, 'status') and user.status != UserStatus.ACTIVE:
+            raise ValueError(f"ข้อผิดพลาด: สมาชิก {user.name} ไม่สามารถสมัครได้เนื่องจากสถานะปัจจุบันคือ {user.status.value}")
+                
         # Validation: เช็คว่าสมัครซ้ำไหม หรือทัวร์เต็ม/ปิดหรือยัง
         if any(m.id == member_id for m in tour.registered_players):
             raise ValueError("คุณได้สมัครทัวร์นาเมนต์นี้ไปแล้ว")

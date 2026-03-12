@@ -207,5 +207,8 @@ class Guest(Golfer):
 
     # 3. Polymorphism: Guest ไม่ได้ส่วนลด
     def calculate_discount(self, amount: float) -> float:
-        return amount
+        return 0.0
+
+    def add_notification(self, notification: Notification):
+        pass
     
