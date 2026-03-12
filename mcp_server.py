@@ -188,7 +188,7 @@ def select_booking_addons(
             assigned_details.append(f"{golfer.name} -> แคดดี้: {caddy.name}")
 
         # 4. จัดการสุ่มแคดดี้ (จุดที่ต้องแก้การเรียก method) [cite: 16]
-        start_idx = len(specific_caddies)
+        start_idxsj = len(specific_caddies)
         if random_caddy_count > 0:
             for i in range(random_caddy_count):
                 golfer = booking.golfers[start_idx + i]
@@ -530,9 +530,9 @@ def issue_rain_check(user_id: str) -> str:
         booking = sys.find_booking_by_member(user_id) # สมมติว่ามี method นี้เพื่อเช็คว่าผู้ใช้มีการจองที่เกี่ยวข้องหรือไม่
         if not booking:
             raise ValueError("Error: ผู้ใช้ไม่พบหรือไม่ได้ทำการจอง")
-        amount = booking.calculate_total_price() * 0.5 # สมมติว่าให้คูปองมูลค่า 50% ของราคาสุทธิการจอง
+        amount , _ = booking.calculate_total_price() # สมมติว่าให้คูปองมูลค่า 50% ของราคาสุทธิการจอง
         # 2. เรียกใช้งาน Method จาก GreenValleySystem
-        new_rc = sys.issue_raincheck_to_user(user_id, amount)
+        new_rc = sys.issue_raincheck_to_user(user_id, amount * 0.25)
 
         if new_rc:
             # คืนค่าเป็น String เพื่อให้ AI นำไปแจ้งผู้ใช้ต่อได้

@@ -90,19 +90,34 @@ class GreenValleySystem:
         # ===============================================
         # walk in na ja
         caddy_data = [
-            ("พี่แนน (Pro)", CaddyLevel.PRO, 600),
-            ("พี่นุ่น (Pro)", CaddyLevel.PRO, 600),
-            ("น้องฝ้าย (Regular)", CaddyLevel.REGULAR, 450),
-            ("น้องโบว์ (Regular)", CaddyLevel.REGULAR, 450),
-            ("สมชาย (Trainee)", CaddyLevel.TRAINEE, 350),
-            ("สมศรี (Trainee)", CaddyLevel.TRAINEE, 350),
-            ("สมหญิง (Trainee)", CaddyLevel.TRAINEE, 350)
+            ("พี่แนน (Pro)", CaddyLevel.PRO, 1200),
+            ("พี่นุ่น (Pro)", CaddyLevel.PRO, 1200),
+            ("น้องฝ้าย (Pro)", CaddyLevel.PRO, 1200),
+            ("น้องโบว์ (Pro)", CaddyLevel.PRO, 1200),
+            ("สมชาย (Pro)", CaddyLevel.PRO, 1200),
+            ("สมศรี (Pro)", CaddyLevel.PRO, 1200),
+            ("สมหญิง (Pro)", CaddyLevel.PRO, 1200),
+            ("พี่แมว (Pro)", CaddyLevel.PRO, 1200),
+            ("พี่ฟ้า (Pro)", CaddyLevel.PRO, 1200),
+            ("น้องอิ่ม (Pro)", CaddyLevel.PRO, 1200),
+            ("น้องเก่ง (Regular)", CaddyLevel.REGULAR, 800),
+            ("สมน้ำหน้า (Regular)", CaddyLevel.REGULAR, 800),
+            ("สมบูรณื (Regular)", CaddyLevel.REGULAR, 800),
+            ("สมมูล (Regular)", CaddyLevel.REGULAR, 800),
+            ("พี่พราววี่ (Regular)", CaddyLevel.REGULAR, 800),
+            ("พี่ต้นกล้ากี้ (Trainee)", CaddyLevel.TRAINEE, 499),
+            ("พี่เจนนีนี่ (Trainee)", CaddyLevel.TRAINEE, 499),
+            ("พี่ต้นหลิววี่ (Trainee)", CaddyLevel.TRAINEE, 499),
+            ("น้องต้น (Trainee)", CaddyLevel.TRAINEE, 499),
+            ("น้องเค้น (Trainee)", CaddyLevel.TRAINEE, 499),
+            ("น้องดี (Trainee)", CaddyLevel.TRAINEE, 499),
+            ("น้องไม่ดี (Trainee)", CaddyLevel.TRAINEE, 499),
         ]
 
         golf_cart_data = [
-            (CartType.STANDARD, 700, 5), 
-            (CartType.COUPLE, 1200, 2), 
-            (CartType.VIP, 2000, 3)
+            (CartType.STANDARD, 790, 20), 
+            (CartType.COUPLE, 1200, 10), 
+            (CartType.VIP, 7777, 7)
         ]
         # สร้างสมาชิกที่มี Strike
 
