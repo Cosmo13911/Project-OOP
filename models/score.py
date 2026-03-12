@@ -17,7 +17,6 @@ class Scorecard:
     def __init__(self, member, course):
         self.__member = member
         self.__course = course
-        # เปลี่ยนจาก {} เป็น [] เพื่อเก็บ ScoreRecord objects
         self.__scores = [] 
 
     @property

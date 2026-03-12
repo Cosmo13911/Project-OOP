@@ -498,16 +498,16 @@ def admin_end_tournament(tour_id: str):
         return {"error": str(e)}
 
 @mcp.tool()
-def issue_rain_check(user_id: str, amount: float) -> str:
+def issue_rain_check(user_id: str) -> str:
     """
     เครื่องมือสำหรับออกคูปอง Rain Check ให้แก่ผู้เล่น (Golfer) 
     ระบบจะสร้างรหัสคูปองอัตโนมัติและส่งการแจ้งเตือนหากเป็นสมาชิก (Member)
     """
     try:
-        # 1. Validation เบื้องต้นตามกฎธุรกิจ (Business Rule) [cite: 99]
-        if amount <= 0:
-            raise ValueError("Error: มูลค่าของ Rain Check ต้องมากกว่า 0 บาท")
-
+        booking = sys.find_booking_by_member(user_id) # สมมติว่ามี method นี้เพื่อเช็คว่าผู้ใช้มีการจองที่เกี่ยวข้องหรือไม่
+        if not booking:
+            raise ValueError("Error: ผู้ใช้ไม่พบหรือไม่ได้ทำการจอง")
+        amount = booking.calculate_total_price() * 0.5 # สมมติว่าให้คูปองมูลค่า 50% ของราคาสุทธิการจอง
         # 2. เรียกใช้งาน Method จาก GreenValleySystem
         new_rc = sys.issue_raincheck_to_user(user_id, amount)
 

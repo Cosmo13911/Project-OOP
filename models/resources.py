@@ -31,7 +31,7 @@ class OrderItem:
 
     @property
     def total_price(self):
-        return self.__product.price * self.__quantity
+        return float(self.__product.price) * int(self.__quantity)
 
 class Order:
     def __init__(self, order_id, buyer):

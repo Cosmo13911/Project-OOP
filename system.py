@@ -3,7 +3,7 @@ from models.tournament import Tournament
 from models.course import Course
 from models.resources import Product, Order, OrderItem, CartType, Caddy, CaddyLevel , GolfCart
 from models.booking import Booking
-from models.enum import SlotStatus, BookingStatus, TournamentStatus, Tier, CourseType 
+from models.enum import SlotStatus, BookingStatus, TournamentStatus, Tier, CourseType, RainCheckStatus
 from models.notification import Notification
 import random 
 from models.payment import Raincheck, RainCheckStatus
@@ -161,6 +161,100 @@ class GreenValleySystem:
         # ตามข้อกำหนดที่ต้องการให้สุ่มเพิ่มคะแนนไว้แล้วทั้ง 18 หลุม
         # 4. จำลองการจอง (Transaction Class [cite: 8])
         # ต้องมีสถานะติดตาม (PENDING, CONFIRMED, CANCELLED) อย่างน้อย 3 สถานะ [cite: 12]
+        # ===============================================
+        # 5. จำลองทัวร์นาเมนต์ (Tournament Simulation)
+        # ===============================================
+        
+        # 5.1 สร้างรายการแข่ง "Green Valley Open 2026"
+        tour_info = self.create_tournament(
+            name="Green Valley Open 2026", 
+            date="25-03-2026", 
+            fee=1500.0, 
+            course_id="C-001"
+        )
+        tour = self.find_tournament(tour_info["tournamentID"])
+        self.close_registration_and_pairing(tour.id)
+        
+        # 5.2 ให้ Member ทุกคนสมัครเข้าแข่งขัน
+        # (จำลองการสมัครและสร้าง Scorecard อัตโนมัติ)
+        for member in self.users:
+            if isinstance(member, Member):
+                tour.add_player(member)
+        
+        # 5.3 เปลี่ยนสถานะเป็นกำลังแข่งขัน เพื่อให้บันทึกคะแนนได้
+        tour.update_status(TournamentStatus.IN_PROGRESS)
+        
+        # 5.4 สุ่มบันทึกคะแนนให้ครบ 18 หลุม สำหรับทุกคน
+        for member in self.users:
+            if isinstance(member, Member):
+                for hole_num in range(1, 19):
+                    # สุ่มคะแนนระหว่าง 2 ถึง 6 strokes ต่อหลุม
+                    random_stroke = random.randint(2, 20)
+                    self.record_tournament_score(
+                        tour_id=tour.id,
+                        member_id=member.id,
+                        hole_number=hole_num,
+                        stroke=random_stroke
+                    )
+
+        # 5.5 สร้าง Tournament เพิ่มเติมรายการที่ 2: "Summer Classic 2026" (สถานะ: เปิดรับสมัคร)
+        tour2_info = self.create_tournament(
+            name="Summer Classic 2026", 
+            date="15-04-2026", 
+            fee=1200.0, 
+            course_id="C-002"
+        )
+        # ให้ Member บางส่วนสมัคร (ยังไม่บันทึกคะแนน)
+        tour2 = self.find_tournament(tour2_info["tournamentID"])
+
+        for member in self.users:
+            if isinstance(member, Member):
+                tour2.add_player(member)
+            
+        self.close_registration_and_pairing(tour.id)
+        tour2.update_status(TournamentStatus.IN_PROGRESS)
+
+        for member in self.users:
+            if isinstance(member, Member):
+                for hole_num in range(1, 19):
+                    # สุ่มคะแนนระหว่าง 2 ถึง 6 strokes ต่อหลุม
+                    random_stroke = random.randint(2, 13)
+                    self.record_tournament_score(
+                        tour_id=tour2.id,
+                        member_id=member.id,
+                        hole_number=hole_num,
+                        stroke=random_stroke
+                    )
+        
+        # 5.3 เปลี่ยนสถานะเป็นกำลังแข่งขัน เพื่อให้บันทึกคะแนนได้
+
+        # 5.6 สร้าง Tournament เพิ่มเติมรายการที่ 3: "Midnight Championship" (สถานะ: แข่งขันเสร็จสิ้น)
+        tour3_info = self.create_tournament(
+            name="Midnight Championship", 
+            date="01-02-2026", 
+            fee=2000.0, 
+            course_id="C-003"
+        )
+        tour3 = self.find_tournament(tour3_info["tournamentID"])
+        
+        for member in self.users:
+            if isinstance(member, Member):
+                tour3.add_player(member)
+            
+        self.close_registration_and_pairing(tour.id)
+        tour3.update_status(TournamentStatus.IN_PROGRESS)
+
+        for member in self.users:
+            if isinstance(member, Member):
+                for hole_num in range(1, 19):
+                    # สุ่มคะแนนระหว่าง 2 ถึง 6 strokes ต่อหลุม
+                    random_stroke = random.randint(0, 7)
+                    self.record_tournament_score(
+                        tour_id=tour3.id,
+                        member_id=member.id,
+                        hole_number=hole_num,
+                        stroke=random_stroke
+                    )
 
 
     def add_member(self, name, phone, tier: Tier,handicap: float = 0.0):
@@ -397,13 +491,11 @@ class GreenValleySystem:
                     raise ValueError(f"Member with ID {booking.requester.id} not found")
                 
                 if rain_check_code:
-                    rain_check = self.find_raincheck(rain_check_code)
-                    if not rain_check:
-                        raise ValueError(f"Rain Check with code {rain_check_code} not found")
+                    rain_check_amount = self.validate_and_use_raincheck(rain_check_code, member.phone)
                 else:
-                    rain_check = None
+                    rain_check_amount = None
 
-                total_price , msg = booking.calculate_total_price(rain_check)
+                total_price , msg = booking.calculate_total_price(rain_check_amount)
                 payment = Payment(total_price, member, booking_id=booking.booking_id, transaction=msg)
                 booking.set_status(BookingStatus.CONFIRMED_PAID)
 
@@ -535,11 +627,12 @@ class GreenValleySystem:
         if not tour: 
             raise ValueError("Tournament not found")
 
-        if tour.status != TournamentStatus.DRAW_PUBLISHED:
+        if tour.status != TournamentStatus.IN_PROGRESS:
             raise ValueError(f"Error: ไม่สามารถจบการแข่งได้ในสถานะ {tour.status.value}")
 
         updated_players = []
 
+        rank = 0
         # 🌟 1. เปลี่ยนมาวนลูป List ของออบเจกต์ Scorecard โดยตรง
         for sc in tour.score_cards:
             # 🌟 2. ความงดงามของ OOP! เราดึง Member จาก Scorecard ได้เลย ไม่ต้อง find_user_by_id แล้ว
@@ -549,9 +642,9 @@ class GreenValleySystem:
                 
             member.add_history(sc, round_type="TOURNAMENT") 
             updated_players.append(f"{member.name} (New HC:{member.current_handicap:.1f})")
-                
-        # อัปเดตสถานะทัวร์นาเมนต์เมื่อทุกอย่างเสร็จสิ้น
-        tour.set_to_completed()
+            member.add_notification(Notification(f"Tournament {tour.name} has ended. Your final score: {sc.get_gross_score()} strokes. New Handicap: {member.current_handicap:.1f}"))   
+            # อัปเดตสถานะทัวร์นาเมนต์เมื่อทุกอย่างเสร็จสิ้น
+        tour.update_status(TournamentStatus.COMPLETED)
 
         return {
             "status": "Success",
@@ -559,7 +652,7 @@ class GreenValleySystem:
             "players_updated": updated_players
         }
 
-    def issue_raincheck_to_user(self, user_id: str, amount: float): #✔️
+    def issue_raincheck_to_user(self, user_id: str, amount: float):
         user = self.find_user(user_id)
         if not user : 
             raise ValueError("Not found user id")
@@ -569,7 +662,7 @@ class GreenValleySystem:
             raise ValueError("Error: ผู้ใช้ไม่พบหรือไม่ได้ทำการจอง")
         
         booking.set_status(BookingStatus.RAIN_CHECK_ISSUED)
-
+        
         if user and isinstance(user, Golfer):
             auto_code = f"RC-{len(self.__rain_checks) + 1:04d}-{user_id}"
             # ดึงเบอร์จาก User เพื่อให้ code ผูกติดกับเบอร์
@@ -588,10 +681,9 @@ class GreenValleySystem:
     
         # เช็ค Raincheck ด้วย code และ user_id โดยดู code ที่ผูกติดกับเบอร์ผ่าน user_id
     def validate_and_use_raincheck(self, code: str, phone: str):
-        if not code: return 0
-        voucher = next((v for v in self.__rain_checks 
-                        if v.code == code and v.phone == phone and v.status == RainCheckStatus.VALID), None)
+        if not code:
+            raise ValueError("Rain Check code is required")
+        voucher = next((v for v in self.__rain_checks if v.code == code and v.phone == phone), None)
         if voucher:
-            voucher.mark_as_used()
             return voucher.amount
-        return -1
+        raise ValueError("Invalid Rain Check code or phone number")
