@@ -16,8 +16,8 @@ async def run_comprehensive_test():
 
     # --- [3] Resource Reuse Test (Today & Tomorrow) ---
     print("\n--- Phase 2: Resource Reuse Test ---")
-    date_today = "12-03-2026"
-    date_tomorrow = "13-03-2026"
+    date_today = "13-03-2026"
+    date_tomorrow = "14-03-2026"
     time_slot = "09:00"
 
     # Day 1 Booking

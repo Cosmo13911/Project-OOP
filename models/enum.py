@@ -46,15 +46,16 @@ class Tier(Enum):
     def discount_rate(self) -> float:
         return self.value
 
-class Booking_day_limit(Enum):
-    SILVER = 7
-    GOLD = 14
-    PLATINUM = 30
-
     @property
-    def day_limit(self) -> int:
-        return self.value
-    
+    def booking_day_limit(self) -> int:
+        if self == Tier.PLATINUM:
+            return 30
+        elif self == Tier.GOLD:
+            return 14
+        elif self == Tier.SILVER:
+            return 7
+        return 0
+        
 class UserStatus(Enum):
     ACTIVE = "ACTIVE"
     WEEKEND_BAN = "WEEKEND_BAN"

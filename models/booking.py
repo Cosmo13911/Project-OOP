@@ -64,7 +64,7 @@ class Booking:
         self.__caddy.clear()
         self.__carts.clear()
 
-    def calculate_total_price(self, rain_check_amount):
+    def calculate_total_price(self, rain_check_amount = 0.0):
         """
         Method หลักในการคำนวณราคาสุทธิของทั้งการจอง
         """
