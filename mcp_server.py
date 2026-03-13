@@ -8,16 +8,13 @@ from models.users import Member, Guest
 from typing import List, Optional
 from datetime import datetime
 
-# 1. Initialize MCP Server
 mcp = FastMCP("GreenValleyMCP")
 
-# 2. Initialize System and Mock Data
 sys = GreenValleySystem()
 sys.create_data()
 
-# ==========================================
 # หมวด User & Ordering (Booking & Products)
-# ==========================================
+
 @mcp.tool()
 def view_rain_checks(rain_check_code: str):
     """
@@ -30,7 +27,6 @@ def view_rain_checks(rain_check_code: str):
         Dict: ข้อมูลมูลค่าคูปองและสถานะ (AVAILABLE, USED) หากไม่พบจะคืนค่า error
     """
     try:
-        # กรองข้อมูลจาก property rain_check
         voucher = sys.find_raincheck(rain_check_code)
         if not voucher:
             return {"error": f"ไม่พบข้อมูล Rain Check รหัส {rain_check_code}"}
@@ -59,17 +55,14 @@ def pay_booking(booking_id: str, rain_check_code = None):
         - เมื่อสำเร็จ สถานะ Booking จะเปลี่ยนเป็น CONFIRMED_PAID และส่ง Notification หาผู้ใช้
     """
     try:
-        # 2. ค้นหาการจอง
         booking = sys.find_booking(booking_id)
         if not booking:
             return {"error": f"ไม่พบข้อมูลการจองรหัส {booking_id}"}
         
         rain_check_code = rain_check_code if rain_check_code else None
 
-        # 4. ดำเนินการชำระเงิน (เรียกใช้ process_payment ใน system)
         payment_result = sys.process_payment(booking = booking, rain_check_code = rain_check_code)
     
-        # 5. อัปเดตสถานะการจองเป็น CONFIRMED (ถ้าชำระเงินสำเร็จ)
         if payment_result:
             return {
                 "message": f"ชำระเงินสำหรับการจอง {booking_id} สำเร็จ!",
@@ -91,7 +84,6 @@ def view_payment_history(user_id: str):
             
         history = []
         for p in sys.payments:
-            # กรองเฉพาะ payment ที่เกี่ยวข้องกับ user นี้ (ตรวจสอบจาก ID หรือข้อมูลอ้างอิง)
             if p.member and p.member.id == user_id:
                 history.append({
                     "payment_id": p.payment_id,
@@ -112,7 +104,6 @@ def view_bookings():
     for b in sys.bookings:
         total_price, breakdown = b.calculate_total_price() 
         
-        # 🌟 แปลง Add-on Object เป็น Dictionary ที่อ่านง่าย
         formatted_addons = []
         for addon in b.get_all_addons:
             if hasattr(addon, 'level'): # กรณีแคดดี้
@@ -124,11 +115,11 @@ def view_bookings():
 
         bookings_list.append({
             "id": b.booking_id, 
-            "group_leader": b.requester.id, # 🌟 ระบุชัดเจนว่าใครเป็นคนจ่าย
+            "group_leader": b.requester.id, 
             "total_group_price": total_price, 
             "slot": b.slot.time, 
             "status": b.status.value, 
-            "addons": formatted_addons, # 🌟 ใช้ตัวแปรที่ format แล้ว
+            "addons": formatted_addons, 
             "orders": len(b.orders), 
             "Transaction_Receipt": breakdown
         })
@@ -139,7 +130,6 @@ def view_products():
     """
     [User] ตรวจสอบรายการสินค้า อาหาร และบริการ พร้อมราคาและจำนวนคงเหลือในสต็อก
     """
-        # เรียกใช้ p.id, p.name, p.price แบบ property ตาม system.py
     products_list = [
         {"id": p.id, "name": p.name, "price": p.price, "remaining_stock": p.stock} 
         for p in sys.products
@@ -158,7 +148,6 @@ def place_order(booking_id: str, product_id: str, quantity: int):
         quantity (int): จำนวนที่ต้องการสั่ง
     """
     try:
-        # เรียกใช้ logic การสั่งซื้อจาก system.py
         result = sys.place_order(booking_id, product_id, quantity)
         return {"message": result}
     except Exception as e:
@@ -183,7 +172,6 @@ def create_golf_booking(member_id: str, course_id: str, date: str, time: str, co
     """
     
     try:
-        # เรียกใช้ create_booking ที่มีการจำกัด 4 คนและล็อก Slot
         new_booking = sys.create_booking(member_id, course_id, date, time, companions)
         return {
             "message": "Booking successful",
@@ -221,7 +209,6 @@ def select_booking_addons(
         if not booking:
             return {"error": f"ไม่พบข้อมูลการจองรหัส {booking_id}"}
 
-        # 1. ตรวจสอบจำนวนผู้เล่นจริงใน Booking Object 
         total_golfers = len(booking.golfers) 
         total_requested_caddies = len(specific_caddies) + random_caddy_count
         
@@ -230,7 +217,6 @@ def select_booking_addons(
 
         booking.clear_addons()
 
-        # 2. ทำ Normalization วันที่ก่อนไปหาทรัพยากรที่ว่าง 
         dt_obj = sys.robust_parse_datetime(f"{booking.slot.play_date} {booking.slot.time}")
         std_date = dt_obj.strftime("%d-%m-%Y")
         time = booking.slot.time
@@ -240,7 +226,7 @@ def select_booking_addons(
         
         assigned_details = []
 
-        # 3. จัดการระบุแคดดี้
+        # จัดการระบุแคดดี้
         for idx, c_id in enumerate(specific_caddies):
             golfer = booking.golfers[idx]
             caddy = next((c for c in available_caddies if c.id == c_id), None)
@@ -251,7 +237,7 @@ def select_booking_addons(
             available_caddies.remove(caddy)
             assigned_details.append(f"{golfer.name} -> แคดดี้: {caddy.name}")
 
-        # 4. จัดการสุ่มแคดดี้ (จุดที่ต้องแก้การเรียก method) [cite: 16]
+        # จัดการสุ่มแคดดี้
         start_idx = len(specific_caddies)
         if random_caddy_count > 0:
             for i in range(random_caddy_count):
@@ -265,15 +251,13 @@ def select_booking_addons(
                 if not caddy:
                     raise ValueError(f"Error: แคดดี้ว่างไม่เพียงพอ")
                 
-                # --- แก้ไขตรงนี้: ลบ golfer.id ออก ให้เหลือแค่ caddy ---
                 booking.assign_caddy(caddy) 
-                # ------------------------------------------------
                 
                 caddy.assign_to_schedule(booking)
                 available_caddies.remove(caddy)
                 assigned_details.append(f"{golfer.name} -> แคดดี้: {caddy.name} (สุ่ม)")
 
-        # 5. จัดการรถกอล์ฟ
+        # จัดการรถกอล์ฟ
         if cart_type and cart_count > 0:
             for _ in range(cart_count):
                 cart = next((c for c in available_carts if c.type.value == cart_type), None)
@@ -323,7 +307,6 @@ def view_transaction(booking_id: str):
 def view_all_caddies():
     """[User/Admin] แสดงรายชื่อแคดดี้ทั้งหมด พร้อมระดับและราคาบริการ"""
     try:
-        # ดึงข้อมูลผ่าน property caddies ใน system.py
         caddy_list = [
             {
                 "id": c.id, 
@@ -357,7 +340,6 @@ def view_all_available_caddies(date: str, time: str):
 def view_all_golf_carts():
     """[User/Admin] แสดงรายการรถกอล์ฟทั้งหมดที่มีในระบบและราคาเช่า"""
     try:
-        # ดึงข้อมูลผ่าน property carts ใน system.py
         cart_list = [
             {
                 "id": c.id, 
@@ -374,7 +356,6 @@ def view_all_golf_carts():
 def admin_view_all_payments():
     """[Admin Only] ดูรายการชำระเงินทั้งหมดที่เกิดขึ้นในระบบ"""
     try:
-        # ดึงข้อมูลผ่าน property payment
         payment_history = [
             {
                 "payment_id": p.payment_id, 
@@ -409,9 +390,7 @@ def view_available_slots(course_id: str, date: str):
     except Exception as e:
         return {"error": str(e)}
 
-# ==========================================
 # หมวด Course Information
-# ==========================================
 
 @mcp.tool()
 def view_all_courses():
@@ -438,9 +417,7 @@ def view_all_courses():
     except Exception as e:
         return {"error": str(e)}
 
-# ==========================================
 # หมวด Tournament (User)
-# ==========================================
 
 @mcp.tool()
 def view_tournaments():
@@ -504,9 +481,7 @@ def view_my_notifications(member_id: str):
     except Exception as e:
         return {"error": str(e)}
 
-# ==========================================
 # หมวด Admin (Tournament Management)
-# ==========================================
 
 @mcp.tool()
 def admin_create_tournament(name: str, date: str, fee: float, course_id: str):
@@ -585,11 +560,9 @@ def issue_rain_check(user_id: str) -> str:
         if not booking:
             raise ValueError("Error: ผู้ใช้ไม่พบหรือไม่ได้ทำการจอง")
         total_price, _ = booking.calculate_total_price()
-        # 2. เรียกใช้งาน Method จาก GreenValleySystem
         calculated_amount = float(total_price) * 0.25
         new_rc = sys.issue_raincheck_to_user(user_id, calculated_amount)
         if new_rc:
-            # คืนค่าเป็น String เพื่อให้ AI นำไปแจ้งผู้ใช้ต่อได้
             return (f"ออกคูปองสำเร็จ!\n"
                     f"รหัสคูปอง: {new_rc.code}\n"
                     f"มูลค่า: {new_rc.amount:,.2f} บาท\n"
@@ -600,17 +573,15 @@ def issue_rain_check(user_id: str) -> str:
     except Exception as e:
         return {"error": str(e)}
 
-# Rain Check Old Version 13/3/2026 02:53
 @mcp.tool()
 def get_user_rainchecks(user_id: str):
-    #test
+    
     """เครื่องมือสำหรับดึงข้อมูล Rain Check ทั้งหมดของผู้ใช้รายนั้น (สำหรับตรวจสอบสถานะและมูลค่า) """
     try:
         user = sys.find_user(user_id)
         if not user:
             return {"error": "ไม่พบผู้ใช้งาน"}
         
-        # กรองข้อมูล Rain Check ที่ผูกกับเบอร์โทรศัพท์ของผู้ใช้
         rainchecks = [
             {
                 "code": rc.code,
@@ -622,7 +593,6 @@ def get_user_rainchecks(user_id: str):
     except Exception as e:
         return {"error": str(e)}
     
-# เพิ่มลงใน mcp_server.py ในหมวด Admin Management
 
 @mcp.tool()
 def admin_add_strike(user_id: str, reason: str, count: int = 1):
@@ -639,10 +609,8 @@ def admin_add_strike(user_id: str, reason: str, count: int = 1):
         - 3 Strikes: ระงับสิทธิ์การใช้งานถาวร/ชั่วคราว 60 วัน (BANNED)
     """
     try:
-        # เรียกใช้งานผ่าน Controller (GreenValleySystem)
         result = sys.admin_strike_user(user_id, count)
         
-        # เพิ่มข้อมูลเหตุผลเข้าไปในผลลัพธ์เพื่อให้ AI ตอบผู้ใช้ได้ครบถ้วน
         result["reason"] = reason
         return result
         
@@ -660,7 +628,7 @@ def admin_clear_user_strikes(user_id: str):
         if not hasattr(user, 'reset_strikes'):
             return {"error": "ผู้ใช้ประเภทนี้ไม่มีระบบ Strike"}
             
-        msg = user.reset_strikes() # เรียกใช้ logic ล้างโทษ
+        msg = user.reset_strikes()
         return {"message": f"ดำเนินการสำเร็จสำหรับ {user.name}", "details": msg}
     except Exception as e:
         return {"error": str(e)}

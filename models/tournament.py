@@ -6,7 +6,6 @@ class MatchGroup:
     def __init__(self, group_number: int, players: list, slot=None):
         # เก็บหมายเลขกลุ่ม (เช่น กลุ่มที่ 1, 2, 3)
         self.__group_number = group_number
-        # เก็บ List ของ Object Member ที่อยู่ในกลุ่มนี้
         self.__players = players 
         self.__slot = slot
 
@@ -24,7 +23,6 @@ class MatchGroup:
     def players(self):
         return self.__players
 
-    # ฟังก์ชันเสริมสำหรับแสดงข้อมูล 
     def __str__(self):
         player_names = ", ".join([p.name for p in self.__players])
         return f"Group {self.__group_number}: {player_names}"
@@ -38,7 +36,7 @@ class Tournament:
         self.__entry_fee = fee
         self.__course = course
         self.__status = TournamentStatus.REGISTRATION_OPEN
-        self.__registered_players = [] # เก็บออบเจกต์ Member ที่จ่ายเงินแล้ว
+        self.__registered_players = [] 
         self.__match_bookings = []
         self.__score_cards = []
         self.__reserved_slots = []
@@ -80,37 +78,31 @@ class Tournament:
         self.__status = TournamentStatus.COMPLETED
 
     def add_player(self, member):
-        # member คือ Instance ของ Member
         if member not in self.__registered_players:
             self.__registered_players.append(member)           
             
-            # 🌟 สร้าง Scorecard instance แล้ว .append() ใส่ List ตรงนี้จบเลย
             new_scorecard = Scorecard(member, self.__course)
             self.__score_cards.append(new_scorecard)
             return True
         return False
 
     def generate_pairing(self):
-        # 🌟 จุดแก้ที่ 3: ยกเลิกการทำ List ซ้อน List เปลี่ยนมาใช้คลาส MatchGroup แทน
         pairings = []
         group_num = 1
         for i in range(0, len(self.registered_players), 4):
             group_players = self.registered_players[i:i+4]
-            # สร้าง Instance ของ MatchGroup แล้วเก็บลง List
             pairings.append(MatchGroup(group_num, group_players))
             group_num += 1
         return pairings
 
     def record_player_score(self, member, hole_number, stroke):
-        # 🌟 จุดแก้ที่ 4: เปลี่ยนจากการหาด้วย Key ใน Dict มาเป็นการวนลูปเปรียบเทียบ Instance
         for sc in self.__score_cards:
-            if sc.member == member:  # เทียบออบเจกต์ Member ตรงๆ ได้เลย (เจ๋งตรงนี้แหละ OOP)
+            if sc.member == member:  
                 sc.record_score(hole_number, stroke)
                 return True
         return False
 
     def get_leaderboard(self):        
-        # 🌟 จุดแก้ที่ 5: self.score_cards เป็น List ของ Object อยู่แล้ว ส่งเข้าไปได้เลย!
         board = Leaderboard(self.score_cards) 
         return board.generate()
 
@@ -118,7 +110,6 @@ class Tournament:
     def get_scorecard_by_member_id(self, member_id):
         """วนลูปหาใบจดคะแนนใน List ตาม ID ของสมาชิก (คืนค่า Instance ของ Scorecard)"""
         for sc in self.__score_cards:
-            # สมมติว่า Member ของคุณมี property ชื่อ ID (ถ้าชื่ออื่นเช่น member_id ให้แก้ด้วยนะครับ)
             if sc.member.id == member_id: 
                 return sc
         return None

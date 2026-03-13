@@ -1,4 +1,3 @@
-# Project-OOP/models/score.py
 from models.enum import SlotStatus, TournamentStatus
 class ScoreRecord:
     def __init__(self, hole_number: int, stroke: int):
@@ -29,10 +28,8 @@ class Scorecard:
 
     def record_score(self, hole_number  : int, stroke: int):
         if stroke > 0:
-            # ตรวจสอบว่าเคยจดหลุมนี้ไปหรือยัง ถ้ามีให้ อัปเดต ถ้าไม่มีให้ append ใหม่
             for record in self.__scores:
                 if record.hole_number == hole_number:
-                    # ในทางปฏิบัติอาจจะสร้าง setter หรือสร้าง object ใหม่ทับ
                     self.__scores.remove(record)
                     break
             
@@ -45,22 +42,16 @@ class Scorecard:
         return len(self.__scores) > 0
 
     def get_gross_score(self):
-        # วนลูปบวกคะแนนจาก List ของ objects
         return sum(record.stroke for record in self.__scores)
 
     def get_course_handicap(self):
-        # ดึงแต้มต่อมาจาก Member
         return self.__member.current_handicap
 
     def get_net_score(self):
         return self.get_gross_score() - self.get_course_handicap()
 
     def get_cumulative_par(self):
-        # ดึงค่าพาร์รวมจากสนาม (Course)
         return self.__course.par
     
-    # เพิ่มใน models/score.py คลาส Scorecard
     def get_adjusted_score(self):
-        # ตามมาตรฐานกอล์ฟ มักจะจำกัดคะแนนต่อหลุมไม่เกิน Net Double Bogey
-        # แต่เบื้องต้นสามารถใช้ Gross Score ไปก่อนได้ถ้ายังไม่มี Logic ซับซ้อน
         return self.get_gross_score()

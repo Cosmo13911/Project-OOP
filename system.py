@@ -45,11 +45,11 @@ class GreenValleySystem:
     @property
     def payments(self): return self.__payments
     
-# กำหนด Format ที่เป็นไปได้ทั้งหมด
+    # กำหนด Format ที่เป็นไปได้ทั้งหมด
     DATE_FORMATS = ["%d-%m-%Y", "%Y-%m-%d"] 
     DATETIME_FORMATS = ["%d-%m-%Y %H:%M", "%Y-%m-%d %H:%M"]
 
-    # สร้างฟังก์ชันกลางในการแปลงวันที่ (Robust Parsing)
+    # ฟังก์ชันกลางในการแปลงวันที่
     def robust_parse_datetime(self, dt_str):
         for fmt in self.DATETIME_FORMATS:
             try:
@@ -60,8 +60,7 @@ class GreenValleySystem:
     
 
     def create_data(self):
-        # 1. สร้างกลุ่มผู้ใช้ (Actors อย่างน้อย 2 กลุ่ม ตามข้อกำหนด [cite: 24])
-        # ประกอบด้วย Jennie, Praw, Rewthai, Tonkla และคนอื่นๆ รวม 8 คน
+        # สร้างกลุ่มผู้ใช้ Member และ Guest
         member_data = [
             ("M-001", "Jennie", "081-111-1111", Tier.PLATINUM),
             ("M-002", "Praw", "081-222-2222", Tier.PLATINUM),
@@ -87,8 +86,6 @@ class GreenValleySystem:
             ("P-005", "Thai Tea", 55, 100)
         ]
 
-        # ===============================================
-        # walk in na ja
         caddy_data = [
             ("พี่แนน (Pro)", CaddyLevel.PRO, 1200),
             ("พี่นุ่น (Pro)", CaddyLevel.PRO, 1200),
@@ -119,14 +116,11 @@ class GreenValleySystem:
             (CartType.COUPLE, 1200, 10), 
             (CartType.VIP, 7777, 7)
         ]
-        # สร้างสมาชิกที่มี Strike
 
-        for u_id, name, phone, tier in member_data:
-            # ทุก attribute ใน Member ต้องเป็น private 
+        for u_id, name, phone, tier in member_data: 
             self.__users.append(Member(u_id, name, phone, tier))
 
         for g_id, name, phone in guest_data:
-        # ใช้คลาส Guest ตามที่ import มาจาก models.users
             self.users.append(Guest(g_id, name, phone))
 
         for name, level, fee in caddy_data:
@@ -135,16 +129,10 @@ class GreenValleySystem:
         for cart_type, fee, quantity in golf_cart_data:
             self.add_golfcart(cart_type, fee, quantity)
 
-        # self.__users.append(Guest("G-001", "Somchai Guest", "089-999-9999")) 
-
-        # m4 = self.add_member("Tim (Silver)", "083-111-5645", Tier.SILVER)
-        # m4.add_strike(3) 
-        # m5 = self.add_member("Jill (Platinum)", "083-121-777", Tier.PLATINUM)
-        # m5.add_strike(2)
-        # 2. สร้างสนามกอล์ฟ 2 สนาม (Entity Class ที่มี ID และจำกัดจำนวน [cite: 10, 11])
-        # สนามที่ 1: Blue Canyon Championship (ยากพิเศษ)
+        
         c1 = Course("C-001", "Blue Canyon Championship", 3500, 4500, CourseType.CHAMPIONSHIP, rating=99.9, slope_rating=148)
-        # ข้อมูลหลุมแบบคละ Par (ให้ดูสมจริงขึ้น ไม่ใช่ Par 4 ทั้งหมด)
+        
+        # ข้อมูลหลุมแบบคละ Par 
         # Front Nine (1-9)
         pars_front = [4, 3, 4, 5, 4, 3, 4, 4, 5] # รวม 36
         for i, p in enumerate(pars_front, 1): c1.add_hole(i, p)
@@ -153,7 +141,6 @@ class GreenValleySystem:
         for i, p in enumerate(pars_back, 10): c1.add_hole(i, p)
         self.__courses.append(c1)
 
-        # สนามที่ 2: Executive/Exclusive Course
         # สนามที่ 2: Laguna Exclusive
         c2 = Course("C-002", "Laguna Exclusive", 2500, 3200, CourseType.EXECUTIVE, rating=71.2, slope_rating=125)
 
@@ -179,19 +166,11 @@ class GreenValleySystem:
         
         self.__courses.append(c3)
 
-        # 3. สร้างข้อมูลสินค้า/บริการ (เพื่อให้ครบองค์ประกอบค่าใช้จ่าย 4 รายการ )
-        # สินค้าเหล่านี้ต้องมี ID และระบุจำนวนที่เหลือได้ 
         for p_id, name, price, stock in product_data:
             self.__products.append(Product(p_id, name, price, stock))
-        # 7. สุ่มบันทึกคะแนนให้ครบ 18 หลุม สำหรับทุกคน (Simulation)
-        # ตามข้อกำหนดที่ต้องการให้สุ่มเพิ่มคะแนนไว้แล้วทั้ง 18 หลุม
-        # 4. จำลองการจอง (Transaction Class [cite: 8])
-        # ต้องมีสถานะติดตาม (PENDING, CONFIRMED, CANCELLED) อย่างน้อย 3 สถานะ [cite: 12]
-        # ===============================================
-        # 5. จำลองทัวร์นาเมนต์ (Tournament Simulation)
-        # ===============================================
+       
         
-        # 5.1 สร้างรายการแข่ง "Green Valley Open 2026"
+        #สร้างรายการแข่ง "Green Valley Open 2026"
         tour_info = self.create_tournament(
             name="Green Valley Open 2026", 
             date="25-03-2026", 
@@ -201,16 +180,16 @@ class GreenValleySystem:
         tour = self.find_tournament(tour_info["tournamentID"])
         self.close_registration_and_pairing(tour.id)
         
-        # 5.2 ให้ Member ทุกคนสมัครเข้าแข่งขัน
+        # ให้ Member ทุกคนสมัครเข้าแข่งขัน
         # (จำลองการสมัครและสร้าง Scorecard อัตโนมัติ)
         for member in self.users:
             if isinstance(member, Member):
                 tour.add_player(member)
         
-        # 5.3 เปลี่ยนสถานะเป็นกำลังแข่งขัน เพื่อให้บันทึกคะแนนได้
+        # เปลี่ยนสถานะเป็นกำลังแข่งขัน เพื่อให้บันทึกคะแนนได้
         tour.update_status(TournamentStatus.IN_PROGRESS)
         
-        # 5.4 สุ่มบันทึกคะแนนให้ครบ 18 หลุม สำหรับทุกคน
+        # สุ่มบันทึกคะแนนให้ครบ 18 หลุม สำหรับทุกคน
         for member in self.users:
             if isinstance(member, Member):
                 for hole_num in range(1, 19):
@@ -223,7 +202,7 @@ class GreenValleySystem:
                         stroke=random_stroke
                     )
 
-        # 5.5 สร้าง Tournament เพิ่มเติมรายการที่ 2: "Summer Classic 2026" (สถานะ: เปิดรับสมัคร)
+        # สร้าง Tournament เพิ่มเติมรายการที่ 2: "Summer Classic 2026" (สถานะ: เปิดรับสมัคร)
         tour2_info = self.create_tournament(
             name="Summer Classic 2026", 
             date="15-04-2026", 
@@ -252,15 +231,15 @@ class GreenValleySystem:
                         stroke=random_stroke
                     )
         
-        # 5.3 เปลี่ยนสถานะเป็นกำลังแข่งขัน เพื่อให้บันทึกคะแนนได้
 
-        # 5.6 สร้าง Tournament เพิ่มเติมรายการที่ 3: "Midnight Championship" (สถานะ: แข่งขันเสร็จสิ้น)
+        # สร้าง Tournament เพิ่มเติมรายการที่ 3: "Midnight Championship" (สถานะ: แข่งขันเสร็จสิ้น)
         tour3_info = self.create_tournament(
             name="Midnight Championship", 
             date="01-02-2026", 
             fee=2000.0, 
             course_id="C-003"
         )
+
         tour3 = self.find_tournament(tour3_info["tournamentID"])
         
         for member in self.users:
@@ -273,7 +252,6 @@ class GreenValleySystem:
         for member in self.users:
             if isinstance(member, Member):
                 for hole_num in range(1, 19):
-                    # สุ่มคะแนนระหว่าง 2 ถึง 6 strokes ต่อหลุม
                     random_stroke = random.randint(0, 7)
                     self.record_tournament_score(
                         tour_id=tour3.id,
@@ -303,7 +281,7 @@ class GreenValleySystem:
             new_cart = GolfCart(new_id, cart_type, fee)
             self.__carts.append(new_cart)
             added_carts.append(new_cart)
-        return added_carts # คืนค่ากลุ่มรายการรถที่ถูกเพิ่มเข้าไป
+        return added_carts 
     
 
     def find_available_caddies(self, date: str, time: str):
@@ -328,8 +306,7 @@ class GreenValleySystem:
         raise ValueError(f"Course with ID {course_id} not found")
 
     def find_available_carts(self, date, time):
-    # กรองเฉพาะรถกอล์ฟที่มีสถานะว่างใน Slot เวลานั้นๆ 
-    # และต้องเป็นไปตามเงื่อนไข 'Entity Class มีจำนวนจำกัด' 
+    
         available = [cart for cart in self.__carts if cart.is_available(date, time)]
         return available
 
@@ -357,7 +334,7 @@ class GreenValleySystem:
                 return product
         raise ValueError(f"Product with ID {product_id} not found")
 
-    # ------------------- booking ----------------------- #
+    
     def find_available_caddies(self, date: str, time: str):
         return [c for c in self.__caddies if c.is_available(date, time)]
     
@@ -377,15 +354,15 @@ class GreenValleySystem:
         now = datetime.now().date()
         target_date = self.parse_date(date_str)
 
-        # กรณี Guest (Walk-in)
+        
         if isinstance(user, Guest):
             if target_date != now:
                 raise ValueError("Walk-in guests can only book for the same day")
 
-        # กรณี Member ตาม Tier
+       
         diff_days = (target_date - now).days
 
-        # ใช้ .tier เพราะเราทำ encapsulation ไว้ในไฟล์ users.py แล้ว
+
         limit = user.tier.booking_day_limit
         if diff_days > limit:
             raise ValueError(f"{user.name} ({user.tier.name}) can only book up to {limit} days in advance. You tried to book {diff_days} days ahead.")
@@ -398,23 +375,23 @@ class GreenValleySystem:
         new_dt = self.parse_datetime(new_date, new_time)     
            
         for b in self.__bookings:
-            # 📌 กรองเฉพาะคิวที่ไม่ได้ยกเลิก และ "จองในวันเดียวกัน" จะได้ทำงานเร็วขึ้น
+            # กรองเฉพาะคิวที่ไม่ได้ยกเลิก และ จองในวันเดียวกัน
             if b.status.value != "CANCELLED" and b.slot.play_date == std_new_date:
                 existing_dt = self.robust_parse_datetime(f"{b.slot.play_date} {b.slot.time}")
                 time_diff = abs((new_dt - existing_dt).total_seconds()) / 3600
                 
                 if time_diff < 5:
                     for g in b.golfers:
-                        # 📌 เช็คคลุมทั้ง user_id (Member) และเบอร์โทร (Walk-in) ในบรรทัดเดียว!
+                        #เช็คคลุมทั้ง user_id (Member) และเบอร์โทร (Walk-in) 
                         if g.user_id == identifier or getattr(g, 'phone', '') == identifier:
                             return False # ปฏิเสธการจอง (เจอคิวซ้ำ)
-        return True # ผ่าน
+        return True 
     
     def create_booking(self, requester_id: str, course_id: str, date: str, time: str, companion_ids: list = None):
         if companion_ids is None:
             companion_ids = []
             
-        # 1. Normalization: แปลงวันที่ให้เป็นมาตรฐานเดียวกันก่อนทำงาน 
+        # แปลงวันที่ให้เป็นมาตรฐานเดียวกันก่อนทำงาน 
         dt_obj = self.robust_parse_datetime(f"{date} {time}")
         std_date = dt_obj.strftime("%d-%m-%Y")
         target_date = dt_obj.date()
@@ -423,11 +400,10 @@ class GreenValleySystem:
         requester = self.find_user(requester_id)
         course = self.find_course(course_id)
 
-        # 2. กฎ: ห้ามจองวันในอดีต [ข้อกำหนดใหม่]
+        # 2. กฎ: ห้ามจองวันในอดีต 
         if target_date < today:
             raise ValueError(f"ไม่สามารถจองย้อนหลังได้ (วันที่ระบุ: {target_date}, วันนี้: {today})")
 
-        # (บรรทัดประมาณ 328) เปลี่ยนการตรวจสอบ Requester ให้ใช้ .value
         if hasattr(requester, 'status'):
             if requester.status.value == "BANNED":
                 raise ValueError(f"การจองถูกปฏิเสธ: คุณ {requester.name} ติดสถานะ BANNED ไม่สามารถจองสนามได้")
@@ -436,26 +412,25 @@ class GreenValleySystem:
                 if target_date.weekday() in [5, 6]:
                     raise ValueError(f"การจองถูกปฏิเสธ: คุณ {requester.name} ติดสถานะ WEEKEND_BAN ไม่สามารถจองสนามในวันหยุดเสาร์-อาทิตย์ได้")
                 
-        # 3. ค้นหาข้อมูลผู้จองและสนาม 
 
-        # 4. กฎการจองล่วงหน้าแยกตามประเภทผู้ใช้ 
+        # กฎการจองล่วงหน้าแยกตามประเภทผู้ใช้ 
         diff_days = (target_date - today).days
 
         if isinstance(requester, Guest):
             if target_date != today:
                 raise ValueError("Guest (Walk-in) สามารถจองได้เฉพาะภายในวันนี้เท่านั้น")
         elif isinstance(requester, Member):
-            # ตรวจสอบ limit ตาม Tier (สูงสุด 30 วันตามกฎใหม่)
+            # ตรวจสอบ limit ตาม Tier 
             limit = requester.tier.booking_day_limit
             if diff_days > limit:
                 raise ValueError(f"สมาชิก Tier {requester.tier.name} จองล่วงหน้าได้สูงสุด {limit} วัน (คุณพยายามจองล่วงหน้า {diff_days} วัน)")
         
-        # 5. ตรวจสอบว่าวันนั้นมี Tournament หรือไม่ [ข้อกำหนดใหม่]
+        # ตรวจสอบว่าวันนั้นมี Tournament หรือไม่ 
         for tour in self.__tournaments:
             if self.is_tournament_day(course_id, date):
                 raise ValueError(f"สนามนี้มีการจัดทัวร์นาเมนต์ในวันที่ {date} ขออภัยในความไม่สะดวก")
 
-        # 2. Validation: ตรวจสอบจำนวนคนในก๊วน (รวมคนจองต้องไม่เกิน 4) 
+        # ตรวจสอบจำนวนคนในก๊วน (รวมคนจองต้องไม่เกิน 4) 
         total_golfers_count = 1 + len(companion_ids)
         if total_golfers_count > self.MAX_GOLFERS_PER_GROUP:
             raise ValueError(f"1 Group can have at most {self.MAX_GOLFERS_PER_GROUP} golfers. You have {total_golfers_count}.")
@@ -463,7 +438,7 @@ class GreenValleySystem:
         requester = self.find_user(requester_id)
         course = self.find_course(course_id)
 
-        # 3. ค้นหาสมาชิกคนอื่นๆ ในก๊วน
+        # ค้นหาสมาชิกคนอื่นๆ ในก๊วน
         companions = []
         for c_id in companion_ids:
             comp = self.find_user(c_id)
@@ -479,22 +454,22 @@ class GreenValleySystem:
                     
                 companions.append(comp)
 
-        # 4. ตรวจสอบ Slot ด้วยวันที่มาตรฐาน
+        # ตรวจสอบ Slot ด้วยวันที่มาตรฐาน
         slot = course.find_slot(std_date, time)
         if not slot or slot.status != SlotStatus.AVAILABLE:
             raise ValueError(f"Slot {time} on {std_date} is not available.")
 
-        # 5. สร้างการจองและล็อก Slot
+        # สร้างการจองและล็อก Slot
         b_id = f"BK-{len(self.__bookings) + 1:03d}"
         new_booking = Booking(b_id, requester, slot)
         
-        # เพิ่มเพื่อนร่วมก๊วนเข้าไป (ตรวจสอบว่าส่ง list ของ object เข้าไป)
+        # เพิ่มเพื่อนร่วมก๊วนเข้าไป 
         for companion in companions:
             new_booking.add_golfer(companion)
 
         slot.status = SlotStatus.RESERVED 
 
-                # 6. แจ้งเตือนทุกคนในก๊วน (Notification - ข้อ 1.20)
+        # แจ้งเตือนทุกคนในก๊วน
         all_players = [requester] + companions
         for player in all_players:
             player.add_notification(Notification(f"Booking id: {b_id}, Course {course.name}, Slot time : {slot.time}"))
@@ -502,7 +477,6 @@ class GreenValleySystem:
         self.__bookings.append(new_booking)
         return new_booking
     
-    # ---------------- Ordering ----------------
     def place_order(self, booking_id: str, product_id: str, quantity: int):
     
         if quantity <= 0:
@@ -536,7 +510,6 @@ class GreenValleySystem:
 
         return f"Order placed successfully. Total: {net_total} THB"
 
-    # ---------------- Tournament ----------------
     def create_tournament(self, name: str, date: str, fee: float, course_id: str):
         course = self.find_course(course_id)
         if not course:
@@ -557,8 +530,7 @@ class GreenValleySystem:
                 return True
         return False
 
-    def process_payment(self, booking: Booking, tour: Tournament = None, member: Member = None, rain_check_code: str = None):
-        # 1. แยกส่วนประกอบของรหัส Payment        
+    def process_payment(self, booking: Booking, tour: Tournament = None, member: Member = None, rain_check_code: str = None):    
         try:
             if tour and member:
                 payment = Payment(tour.entry_fee, member, tournament_id=tour.id)
@@ -580,8 +552,6 @@ class GreenValleySystem:
             payment.set_status(PaymentStatus.SUCCESS)
             self.__payments.append(payment)
 
-            
-            # [เพิ่ม] การแจ้งเตือนการชำระเงินเสร็จสิ้น
             msg = f"Payment Successful! [{payment.get_type}] is confirmed. Amount: {payment.amount:,.2f} THB"
             member.add_notification(Notification(msg))     
 
@@ -604,7 +574,7 @@ class GreenValleySystem:
         for group_obj in pairings:
             current_players = group_obj.players
             
-            # 1. ค้นหาสล็อตว่าง
+            # ค้นหาสล็อตว่าง
             available_slot = None
             for slot in course.slots:
                 if slot.status == SlotStatus.AVAILABLE and slot.play_date == target_date:
@@ -614,10 +584,10 @@ class GreenValleySystem:
             if not available_slot:
                 raise ValueError(f"No available slots on {target_date}")
             
-            # 2. ผูกสล็อตเข้ากับกลุ่มการแข่ง
+            # ผูกสล็อตเข้ากับกลุ่มการแข่ง
             group_obj.slot = available_slot
             
-            # 3. สร้าง Booking และส่ง Notification
+            # สร้าง Booking และส่ง Notification
             b_id = f"BK-T-{len(self.bookings) + 1:03d}"
             new_booking = Booking(b_id, current_players[0], available_slot)
             new_booking.set_status(BookingStatus.CONFIRMED_PAID)
@@ -625,7 +595,6 @@ class GreenValleySystem:
             for companion in current_players[1:]:
                 new_booking.add_golfer(companion)
             
-            # --- เพิ่มส่วนการแจ้งเตือนรอบเวลาแข่ง ---
             msg = f"Tournament {tour.name}: Your Tee-off is at {available_slot.time} on {target_date}."
             for p in current_players:
                 p.add_notification(Notification(msg))
@@ -643,7 +612,6 @@ class GreenValleySystem:
         if not tour: 
             raise ValueError("Tournament not found")
         
-        # 🌟 เพิ่มบรรทัดนี้: ค้นหาออบเจกต์ Member จริงๆ จาก ID ก่อน
         member_obj = self.find_user(member_id)
         if not member_obj:
             raise ValueError(f"Member with ID {member_id} not found")
@@ -651,7 +619,6 @@ class GreenValleySystem:
         if tour.status.value != "IN_PROGRESS": 
             raise ValueError("Tournament is not in progress")
 
-        # 🌟 แก้ไข: ส่ง member_obj (Object) แทน member_id (String)
         success = tour.record_player_score(member_obj, hole_number, stroke)
         if not success: 
             raise ValueError("Failed to record score. Scorecard not found for this member.")
@@ -669,24 +636,22 @@ class GreenValleySystem:
             "leaderboard": tour.get_leaderboard()
         }
     
-    # เพิ่มใน system.py
     def register_tournament_pending(self, member_id: str, tour_id: str):
         
         tour = self.find_tournament(tour_id)
         member = self.find_user(member_id)
         
-        user = self.find_user(member_id) # เปลี่ยนชื่อตัวแปรให้สื่อความหมายกว้างขึ้น
+        user = self.find_user(member_id) 
     
-        # 1. ตรวจสอบว่าเป็น Guest หรือไม่ (Guest ห้ามสมัคร)
+        # ตรวจสอบว่าเป็น Guest หรือไม่ (Guest ห้ามสมัคร)
         if isinstance(user, Guest):
             raise ValueError(f"ข้อผิดพลาด: Guest ({user.name}) ไม่สามารถสมัครทัวร์นาเมนต์ได้ สิทธิ์นี้เฉพาะสมาชิกเท่านั้น")
         
-        # 2. ตรวจสอบสถานะการโดนแบน (Member ที่สถานะไม่ใช่ ACTIVE ห้ามสมัคร)
-        # อ้างอิงจากสถานะใน models/users.py และ models/enum.py
+        # ตรวจสอบสถานะการโดนแบน (Member ที่สถานะไม่ใช่ ACTIVE ห้ามสมัคร)
         if hasattr(user, 'status') and user.status != UserStatus.ACTIVE:
             raise ValueError(f"ข้อผิดพลาด: สมาชิก {user.name} ไม่สามารถสมัครได้เนื่องจากสถานะปัจจุบันคือ {user.status.value}")
                 
-        # Validation: เช็คว่าสมัครซ้ำไหม หรือทัวร์เต็ม/ปิดหรือยัง
+        # เช็คว่าสมัครซ้ำไหม หรือทัวร์เต็ม/ปิดหรือยัง
         if any(m.id == member_id for m in tour.registered_players):
             raise ValueError("คุณได้สมัครทัวร์นาเมนต์นี้ไปแล้ว")
             
@@ -696,7 +661,7 @@ class GreenValleySystem:
             member=member, 
             tournament_id=tour.id
         )
-        payment.set_status(PaymentStatus.PENDING) # สำคัญ: ตั้งเป็นรอดำเนินการ
+        payment.set_status(PaymentStatus.PENDING) 
         self.__payments.append(payment)
         
         # เพิ่มชื่อเข้าทัวร์นาเมนต์ (ชื่อจะไปปรากฏในระบบแล้ว แต่สถานะการเงินยังไม่ Success)
@@ -706,9 +671,7 @@ class GreenValleySystem:
         
         return payment.payment_id
     
-    # เพิ่มใน system.py
     def confirm_tournament_payment(self, payment_id: str):
-        # ค้นหารายการ Payment จาก ID
         payment = next((p for p in self.__payments if p.payment_id == payment_id), None)
         
         if not payment:
@@ -717,37 +680,27 @@ class GreenValleySystem:
         if not getattr(payment, 'tournament_id', None):
             raise ValueError(f"ข้อผิดพลาด: รหัส {payment_id} เป็นบิลค่าจองสนาม ไม่สามารถนำมาชำระค่าสมัครทัวร์นาเมนต์ได้")
             
-        # เปลี่ยนสถานะเป็นสำเร็จ
         payment.set_status(PaymentStatus.SUCCESS)
         
-        # แจ้งเตือนผู้ใช้
         payment.member.add_notification(Notification(f"ชำระเงินค่าสมัครทัวร์นาเมนต์ {payment.tournament_id} เรียบร้อยแล้ว!"))
         
         return True 
     
-    # เพิ่มลงในคลาส GreenValleySystem ในไฟล์ system.py
     def process_registration_payment(self, member_id: str, tour_id: str):
         """จัดการชำระเงินค่าสมัครทัวร์นาเมนต์และเพิ่มชื่อผู้เข้าแข่งขัน"""
-        # 1. Find Tournament and Member objects
         tour = self.find_tournament(tour_id)
         member = self.find_user(member_id)
 
-        # 2. Check if already registered
         if any(entry.id == member.id for entry in tour.registered_players):
             raise ValueError("Already registered for this tournament.")
 
-        # 3. Check Tournament status
         if tour.status != TournamentStatus.REGISTRATION_OPEN:
             raise ValueError(f"Tournament registration is {tour.status.value}")
 
-        # --- FIX: Pass arguments as keywords to bypass the 'booking' positional argument ---
-        # This prevents the "'str' object has no attribute 'requester'" error
         self.process_payment(booking=None, tour=tour, member=member) 
 
-        # 5. Add player to tournament
         tour.add_player(member)
 
-        # 6. Notify the member
         msg = f"Payment Successful for {tour.name}. Amount: {tour.entry_fee} THB"
         member.add_notification(Notification(msg))
 
@@ -767,9 +720,7 @@ class GreenValleySystem:
         updated_players = []
 
         rank = 0
-        # 🌟 1. เปลี่ยนมาวนลูป List ของออบเจกต์ Scorecard โดยตรง
         for sc in tour.score_cards:
-            # 🌟 2. ความงดงามของ OOP! เราดึง Member จาก Scorecard ได้เลย ไม่ต้อง find_user_by_id แล้ว
             member = sc.member 
             if not member:
                 raise ValueError(f"Member not found for Scorecard with member ID {sc.member.user_id}")
@@ -777,7 +728,6 @@ class GreenValleySystem:
             member.add_history(sc, round_type="TOURNAMENT") 
             updated_players.append(f"{member.name} (New HC:{member.current_handicap:.1f})")
             member.add_notification(Notification(f"Tournament {tour.name} has ended. Your final score: {sc.get_gross_score()} strokes. New Handicap: {member.current_handicap:.1f}"))   
-            # อัปเดตสถานะทัวร์นาเมนต์เมื่อทุกอย่างเสร็จสิ้น
         tour.update_status(TournamentStatus.COMPLETED)
 
         return {
@@ -800,12 +750,9 @@ class GreenValleySystem:
             
             if user and isinstance(user, Golfer):
                 auto_code = f"RC-{len(self.__rain_checks) + 1:04d}-{user_id}"
-                # ดึงเบอร์จาก User เพื่อให้ code ผูกติดกับเบอร์
                 new_rc = Raincheck(code=auto_code, amount=amount, phone=user.phone)
-                # เพพิ่มลงใน system & user(member/guest)
                 self.__rain_checks.append(new_rc)
                 user.add_raincheck(new_rc)
-                # ส่ง noti ไปที่ member 
                 msg = f"คุณได้รับคูปอง Rain Check รหัส {auto_code} มูลค่า {amount:,.2f} บาท"
                 
                 if user and isinstance(user, Member):
@@ -816,7 +763,6 @@ class GreenValleySystem:
         except Exception as e:
             raise ValueError(f"Error issuing Rain Check: {str(e)}")
     
-        # เช็ค Raincheck ด้วย code และ user_id โดยดู code ที่ผูกติดกับเบอร์ผ่าน user_id
     def validate_and_use_raincheck(self, code: str, phone: str):
         if not code:
             raise ValueError("Rain Check code is required")
@@ -833,10 +779,8 @@ class GreenValleySystem:
         if not isinstance(user, Golfer):
             raise ValueError(f"User {user_id} ไม่ใช่ประเภท Golfer ไม่สามารถรับ Strike ได้")
         
-        # เรียกใช้ logic การเพิ่ม strike ที่อยู่ใน Model (users.py)
         total_strikes = user.add_strike(count)
         
-        # แจ้งเตือนผู้ใช้ผ่านระบบ Notification
         msg = f"คุณได้รับ Strike เพิ่มจำนวน {count} ครั้ง (รวมทั้งหมด {total_strikes} ครั้ง) สถานะปัจจุบัน: {user.status.value}"
         if isinstance(user, Member):
             user.add_notification(Notification(msg))
@@ -852,7 +796,6 @@ class GreenValleySystem:
        
         history = []
         for p in self.__payments:
-            # ตอนนี้เราเรียก p.member ได้แล้วเพราะเราเพิ่ม @property เข้าไปใน models/payment.py
             if p.member and p.member.id == user_id:
                 history.append({
                     "payment_id": p.payment_id,
@@ -868,13 +811,10 @@ class GreenValleySystem:
         if not booking:
             raise ValueError(f"ไม่พบการจองรหัส {booking_id}")
 
-        # 1. ถ้ารายการนี้จ่ายเงินไปแล้ว ให้ดึง "ใบเสร็จที่บันทึกไว้ (Immutable Record)" จาก Payment มาแสดง
-        # ซึ่งในใบเสร็จนี้จะมีการหักยอด rain_check_coupon เก็บไว้อย่างถูกต้องแล้ว
         if booking.status.value == "CONFIRMED_PAID":
             payment = next((p for p in self.__payments if getattr(p, 'booking_id', None) == booking_id), None)
             if payment and payment.get_transaction_details():
                 return payment.get_transaction_details()
-                
-        # 2. ถ้ายังไม่จ่ายเงิน (PENDING_PAYMENT) ให้คำนวณสดแบบปกติตามต้นทุน (ยอดก่อนหักคูปอง)
+        
         total_price, msg = booking.calculate_total_price(0.0) 
         return msg

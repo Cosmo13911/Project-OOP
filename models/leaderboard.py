@@ -8,7 +8,6 @@ class LeaderboardEntry:
         self.__net_score = net_score
         self.__to_par = to_par
 
-    # สร้าง Getters เพื่อให้ดึงข้อมูลไปแสดงผลได้
     @property
     def rank_no(self): return self.__rank_no
     
@@ -30,7 +29,6 @@ class LeaderboardEntry:
     @property
     def to_par(self): return self.__to_par
 
-    # สำหรับแสดงผลให้เหมือนเดิม (แปลงกลับเป็น dict เมื่อต้องการใช้กับ API/JSON)
     def to_dict(self):
         return {
             "rank_no": self.__rank_no,
@@ -56,9 +54,8 @@ class Leaderboard:
                 cum_par = scorecard.get_cumulative_par()
                 to_par_value = gross - cum_par
                 
-                # สร้าง Object แทนการสร้าง Dict
                 entry = LeaderboardEntry(
-                    rank_no=0,  # กำหนดค่าเริ่มต้นไว้ก่อน แล้วค่อยคำนวณทีหลัง
+                    rank_no=0,  
                     member_name=scorecard.member.name,
                     handicap=int(round(scorecard.get_course_handicap())),
                     gross_score=gross,
@@ -67,7 +64,6 @@ class Leaderboard:
                 )
                 results.append(entry)
 
-        # การ Sort: เปลี่ยนจาก x["key"] เป็น x.property
         results.sort(key=lambda x: (x.net_score, x.gross_score))
 
         # การคำนวณอันดับ (Ranking Logic)
@@ -82,5 +78,4 @@ class Leaderboard:
                 else:
                     current_player.rank_no = i + 1
         
-        # คืนค่าเป็น List ของ Objects หรือจะคืนเป็น List ของ Dict เพื่อความเข้ากันได้กับ API เดิมก็ได้
         return [res.to_dict() for res in results]

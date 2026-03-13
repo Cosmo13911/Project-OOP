@@ -43,7 +43,6 @@ class Order:
     def items(self): return self.__items
     @property
     def price(self):
-        # มี Logic การคำนวณส่วนลด จึงคงไว้เป็น Method
         sub_total = sum(item.total_price for item in self.__items)
         discount = self.__buyer.calculate_discount(sub_total)
         return sub_total - discount

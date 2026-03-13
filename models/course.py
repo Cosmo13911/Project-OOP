@@ -80,7 +80,6 @@ class Course:
         return None
     
     def add_hole(self, number: int, par: int):
-        # ตรวจสอบก่อนเพิ่มเพื่อป้องกันเลขหลุมซ้ำ (Guard Clause)
         if any(h.number == number for h in self.__holes):
             return
         
@@ -89,14 +88,12 @@ class Course:
             self.__holes.append(new_hole)
 
     def get_hole_par(self, number: int):
-        # วนลูปหาหลุมที่หมายเลขตรงกันใน List ของ Hole objects
         for hole in self.__holes:
             if hole.number == number:
                 return hole.par
         raise ValueError(f"ไม่พบข้อมูลหลุมที่ {number} ในสนามนี้")
     
     def get_hole_info(self, number: int):
-        # วนลูปหาเพื่อคืนค่า Object Hole ทั้งใบ
         for hole in self.__holes:
             if hole.number == number:
                 return hole
@@ -104,10 +101,8 @@ class Course:
 
 class TeeTimeSlot:
     def __init__(self, play_date, time, course):
-        # ทุก attribute เป็น private ทั้งหมด 
         self.__play_date = play_date
         self.__time = time
-        # มีสถานะติดตามอย่างน้อย 3 สถานะ 
         self.__course = course
         self.__status = SlotStatus.AVAILABLE 
 
@@ -124,11 +119,10 @@ class TeeTimeSlot:
     def status(self, new_status): 
         self.__status = new_status
 
-# สร้างคลาสใหม่สืบทอด (Inherit) จาก TeeTimeSlot ตาม Requirement
 class Course1Reserve(TeeTimeSlot):
     def __init__(self, play_date, time, course):
-        super().__init__(play_date, time, course) # ส่งค่าให้คลาสแม่จัดการ
-        self.__hole = 1 # เก็บค่าเฉพาะตัวไว้ที่นี่
+        super().__init__(play_date, time, course) 
+        self.__hole = 1 
 
     @property
     def get_hole(self): return self.__hole

@@ -10,13 +10,11 @@ class History:
         sc__score_card_instance: รับเป็นออบเจกต์ sc__score_card เลย (เพราะข้างในมี Course และ List ของ ScoreRecord ครบหมดแล้ว)
         """
         self.__score_card = score_card_instance
-        self.__date = datetime.now() # เก็บวันที่บันทึกประวัติ
+        self.__date = datetime.now() 
 
-        # 🌟 โค้ดสั้นลงมาก! เพราะเราโยนหน้าที่คำนวณไปให้ sc__score_card และ ScoreRecord ทำหมดแล้ว
         self.__gross_score = self.__score_card.get_gross_score()
         self.__adjusted_score = self.__score_card.get_adjusted_score()
 
-    # --- Properties ---
     @property
     def score_card(self):
         return self.__score_card
@@ -39,7 +37,6 @@ class History:
 
     @property
     def course(self):
-        # ดึง Course ผ่าน sc__score_card ได้เลย
         return self.__score_card.course
     
 # 1. Abstract Class
@@ -108,7 +105,6 @@ class Golfer(User):
         self.__status = UserStatus.ACTIVE
         return "Strikes have been reset to 0 and status is now ACTIVE."
 
-    # 🌟 ฟังก์ชันเสริม: เอาไว้รับคะแนนจาก sc__score_card มาใส่ประวัติ
     def add_history(self, score_card_instance, round_type="General"):
         new_record = History(score_card_instance)
 
@@ -123,15 +119,13 @@ class Golfer(User):
         recent_history = self.__history[-20:]
         differentials = []
         for record in recent_history:
-            # เรียกใช้ get_gross_score() ที่เราแก้ให้คำนวณจาก List แล้ว
-            # คำนวณ Differential โดยใช้ค่าจาก Course ที่ผูกกับ sc__score_card นั้นๆ
             diff = (record.adjusted_score - record.score_card.course.rating) * (113 / record.score_card.course.slope_rating)
             differentials.append(diff)        
 
         differentials.sort()
         num_scores = len(differentials)
 
-        # 5. หาค่าเฉลี่ยตามจำนวนรอบที่มี (ตามเกณฑ์มาตรฐาน WHS)
+        # หาค่าเฉลี่ยตามจำนวนรอบที่มี (ตามเกณฑ์มาตรฐาน WHS)
         hi = 0.0
         if num_scores == 1:
 
@@ -175,7 +169,7 @@ class Golfer(User):
 
         else: # 20 รอบพอดี
             hi = sum(differentials[:8]) / 8
-        # 6. อัปเดตแต้มต่อใหม่ (จำกัดสูงสุดไม่เกิน 54.0 ตามมาตรฐาน WHS)
+        # อัปเดตแต้มต่อใหม่ (จำกัดสูงสุดไม่เกิน 54.0 ตามมาตรฐาน WHS)
 
         new_handicap = round(min(max(hi, 0.0), 54.0), 1)
         self.__current_handicap = new_handicap
@@ -190,7 +184,7 @@ class Member(Golfer):
     @property
     def tier(self): return self.__tier
 
-    # 3. Polymorphism: Member ได้ส่วนลดตาม Tier (สิทธิ์/ส่วนลด 1 ประเภท)
+    # Polymorphism: Member ได้ส่วนลดตาม Tier (สิทธิ์/ส่วนลด 1 ประเภท)
     def calculate_discount(self, amount: float) -> float:
         return amount * self.__tier.discount_rate
     
@@ -207,7 +201,7 @@ class Guest(Golfer):
     def __init__(self, user_id: str, name: str, phone: str):
         super().__init__(user_id, name, phone, handicap=0.0)
 
-    # 3. Polymorphism: Guest ไม่ได้ส่วนลด
+    # Polymorphism: Guest ไม่ได้ส่วนลด
     def calculate_discount(self, amount: float) -> float:
         return 0.0
 
