@@ -188,7 +188,7 @@ def select_booking_addons(
             assigned_details.append(f"{golfer.name} -> แคดดี้: {caddy.name}")
 
         # 4. จัดการสุ่มแคดดี้ (จุดที่ต้องแก้การเรียก method) [cite: 16]
-        start_idxsj = len(specific_caddies)
+        start_idx = len(specific_caddies)
         if random_caddy_count > 0:
             for i in range(random_caddy_count):
                 golfer = booking.golfers[start_idx + i]
@@ -546,6 +546,7 @@ def issue_rain_check(user_id: str) -> str:
     except Exception as e:
         return f"System Error: เกิดข้อผิดพลาดทางเทคนิค - {str(e)}"
 
+# Rain Check Old Version 13/3/2026 02:53
 @mcp.tool()
 def get_user_rainchecks(user_id: str):
     #test
