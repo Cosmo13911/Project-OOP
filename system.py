@@ -420,13 +420,23 @@ class GreenValleySystem:
         target_date = dt_obj.date()
         today = datetime.now().date()
 
+        requester = self.find_user(requester_id)
+        course = self.find_course(course_id)
+
         # 2. กฎ: ห้ามจองวันในอดีต [ข้อกำหนดใหม่]
         if target_date < today:
             raise ValueError(f"ไม่สามารถจองย้อนหลังได้ (วันที่ระบุ: {target_date}, วันนี้: {today})")
 
+        # (บรรทัดประมาณ 328) เปลี่ยนการตรวจสอบ Requester ให้ใช้ .value
+        if hasattr(requester, 'status'):
+            if requester.status.value == "BANNED":
+                raise ValueError(f"การจองถูกปฏิเสธ: คุณ {requester.name} ติดสถานะ BANNED ไม่สามารถจองสนามได้")
+            elif requester.status.value == "WEEKEND_BAN":
+                # ตรวจสอบว่าเป็นวันเสาร์ (5) หรือ อาทิตย์ (6) หรือไม่
+                if target_date.weekday() in [5, 6]:
+                    raise ValueError(f"การจองถูกปฏิเสธ: คุณ {requester.name} ติดสถานะ WEEKEND_BAN ไม่สามารถจองสนามในวันหยุดเสาร์-อาทิตย์ได้")
+                
         # 3. ค้นหาข้อมูลผู้จองและสนาม 
-        requester = self.find_user(requester_id)
-        course = self.find_course(course_id)
 
         # 4. กฎการจองล่วงหน้าแยกตามประเภทผู้ใช้ 
         diff_days = (target_date - today).days
@@ -460,6 +470,13 @@ class GreenValleySystem:
             if comp:
                 if comp == requester:
                     raise ValueError("Requester cannot be a companion to themselves.")
+                
+                if hasattr(comp, 'status'):
+                    if comp.status.value == "BANNED":
+                        raise ValueError(f"การจองถูกปฏิเสธ: เพื่อนร่วมก๊วน ({comp.name}) ติดสถานะ BANNED")
+                    elif comp.status.value == "WEEKEND_BAN" and target_date.weekday() in [5, 6]:
+                        raise ValueError(f"การจองถูกปฏิเสธ: เพื่อนร่วมก๊วน ({comp.name}) ติดสถานะ WEEKEND_BAN ไม่สามารถร่วมเล่นวันเสาร์-อาทิตย์ได้")
+                    
                 companions.append(comp)
 
         # 4. ตรวจสอบ Slot ด้วยวันที่มาตรฐาน
@@ -697,6 +714,9 @@ class GreenValleySystem:
         if not payment:
             raise ValueError("ไม่พบรายการชำระเงินนี้")
             
+        if not getattr(payment, 'tournament_id', None):
+            raise ValueError(f"ข้อผิดพลาด: รหัส {payment_id} เป็นบิลค่าจองสนาม ไม่สามารถนำมาชำระค่าสมัครทัวร์นาเมนต์ได้")
+            
         # เปลี่ยนสถานะเป็นสำเร็จ
         payment.set_status(PaymentStatus.SUCCESS)
         
@@ -767,31 +787,34 @@ class GreenValleySystem:
         }
 
     def issue_raincheck_to_user(self, user_id: str, amount: float):
-        user = self.find_user(user_id)
-        if not user : 
-            raise ValueError("Not found user id")
-
-        booking = self.find_booking_by_member(user_id) # สมมติว่ามี method นี้เพื่อเช็คว่าผู้ใช้มีการจองที่เกี่ยวข้องหรือไม่
-        if not booking:
-            raise ValueError("Error: ผู้ใช้ไม่พบหรือไม่ได้ทำการจอง")
-        
-        booking.set_status(BookingStatus.RAIN_CHECK_ISSUED)
-        
-        if user and isinstance(user, Golfer):
-            auto_code = f"RC-{len(self.__rain_checks) + 1:04d}-{user_id}"
-            # ดึงเบอร์จาก User เพื่อให้ code ผูกติดกับเบอร์
-            new_rc = Raincheck(code=auto_code, amount=amount, phone=user.phone)
-            # เพพิ่มลงใน system & user(member/guest)
-            self.__rain_checks.append(new_rc)
-            user.add_raincheck(new_rc)
-            # ส่ง noti ไปที่ member 
-            msg = f"คุณได้รับคูปอง Rain Check รหัส {auto_code} มูลค่า {amount:,.2f} บาท"
+        try:
+            user = self.find_user(user_id)
+            if not user : 
+                raise ValueError("Not found user id")
             
-            if user and isinstance(user, Member):
-                user.add_notification(Notification(msg))
+            booking = self.find_booking_by_member(user_id)
+            if not booking:
+                raise ValueError(f"ไม่พบรายการจองที่สามารถออก Rain Check ได้สำหรับผู้ใช้ {user_id}")
+
+            booking.set_status(BookingStatus.RAIN_CHECK_ISSUED)
+            
+            if user and isinstance(user, Golfer):
+                auto_code = f"RC-{len(self.__rain_checks) + 1:04d}-{user_id}"
+                # ดึงเบอร์จาก User เพื่อให้ code ผูกติดกับเบอร์
+                new_rc = Raincheck(code=auto_code, amount=amount, phone=user.phone)
+                # เพพิ่มลงใน system & user(member/guest)
+                self.__rain_checks.append(new_rc)
+                user.add_raincheck(new_rc)
+                # ส่ง noti ไปที่ member 
+                msg = f"คุณได้รับคูปอง Rain Check รหัส {auto_code} มูลค่า {amount:,.2f} บาท"
                 
-            return new_rc
-        return None
+                if user and isinstance(user, Member):
+                    user.add_notification(Notification(msg))
+                return new_rc
+            else:
+                raise ValueError("ผู้ใช้ประเภทนี้ไม่สามารถรับ Rain Check ได้")
+        except Exception as e:
+            raise ValueError(f"Error issuing Rain Check: {str(e)}")
     
         # เช็ค Raincheck ด้วย code และ user_id โดยดู code ที่ผูกติดกับเบอร์ผ่าน user_id
     def validate_and_use_raincheck(self, code: str, phone: str):
@@ -799,6 +822,59 @@ class GreenValleySystem:
             raise ValueError("Rain Check code is required")
         voucher = next((v for v in self.__rain_checks if v.code == code and v.phone == phone), None)
         if voucher:
+            voucher.set_status(RainCheckStatus.USED)
             return voucher.amount
         
-        raise ValueError("Invalid Rain Check code or phone number")
+        raise ValueError("คูปองไม่ถูกต้อง, เบอร์โทรไม่ตรง หรือคูปองนี้ถูกใช้ไปแล้ว")
+    
+    def admin_strike_user(self, user_id: str, count: int = 1):
+       
+        user = self.find_user(user_id)
+        if not isinstance(user, Golfer):
+            raise ValueError(f"User {user_id} ไม่ใช่ประเภท Golfer ไม่สามารถรับ Strike ได้")
+        
+        # เรียกใช้ logic การเพิ่ม strike ที่อยู่ใน Model (users.py)
+        total_strikes = user.add_strike(count)
+        
+        # แจ้งเตือนผู้ใช้ผ่านระบบ Notification
+        msg = f"คุณได้รับ Strike เพิ่มจำนวน {count} ครั้ง (รวมทั้งหมด {total_strikes} ครั้ง) สถานะปัจจุบัน: {user.status.value}"
+        if isinstance(user, Member):
+            user.add_notification(Notification(msg))
+            
+        return {
+            "user_name": user.name,
+            "total_strikes": total_strikes,
+            "current_status": user.status.value,
+            "message": "บันทึก Strike เรียบร้อยแล้ว"
+        }
+
+    def get_user_payment_history(self, user_id: str):
+       
+        history = []
+        for p in self.__payments:
+            # ตอนนี้เราเรียก p.member ได้แล้วเพราะเราเพิ่ม @property เข้าไปใน models/payment.py
+            if p.member and p.member.id == user_id:
+                history.append({
+                    "payment_id": p.payment_id,
+                    "type": p.get_type,
+                    "amount": p.amount,
+                    "status": p.status.value,
+                    "time": p.time
+                })
+        return history
+    
+    def get_booking_transaction_details(self, booking_id: str):
+        booking = self.find_booking(booking_id)
+        if not booking:
+            raise ValueError(f"ไม่พบการจองรหัส {booking_id}")
+
+        # 1. ถ้ารายการนี้จ่ายเงินไปแล้ว ให้ดึง "ใบเสร็จที่บันทึกไว้ (Immutable Record)" จาก Payment มาแสดง
+        # ซึ่งในใบเสร็จนี้จะมีการหักยอด rain_check_coupon เก็บไว้อย่างถูกต้องแล้ว
+        if booking.status.value == "CONFIRMED_PAID":
+            payment = next((p for p in self.__payments if getattr(p, 'booking_id', None) == booking_id), None)
+            if payment and payment.get_transaction_details():
+                return payment.get_transaction_details()
+                
+        # 2. ถ้ายังไม่จ่ายเงิน (PENDING_PAYMENT) ให้คำนวณสดแบบปกติตามต้นทุน (ยอดก่อนหักคูปอง)
+        total_price, msg = booking.calculate_total_price(0.0) 
+        return msg

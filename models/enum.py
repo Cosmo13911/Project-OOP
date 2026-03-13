@@ -56,7 +56,7 @@ class Tier(Enum):
             return 7
         return 0
         
-class UserStatus(Enum):
+class UserStatus(str,Enum):
     ACTIVE = "ACTIVE"
     WEEKEND_BAN = "WEEKEND_BAN"
     BANNED = "BANNED"

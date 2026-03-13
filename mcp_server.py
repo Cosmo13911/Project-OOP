@@ -20,25 +20,43 @@ sys.create_data()
 # ==========================================
 @mcp.tool()
 def view_rain_checks(rain_check_code: str):
-    """ตรวจสอบรายการ Rain Check (คูปองคืนเงิน) ที่ผูกกับเบอร์โทรศัพท์"""
+    """
+    ตรวจสอบรายละเอียดของ Rain Check (คูปองคืนเงิน) โดยใช้รหัสคูปอง
+    
+    Args:
+        rain_check_code (str): รหัสคูปองที่ขึ้นต้นด้วย 'RC-' (เช่น 'RC-0001-M-001')
+    
+    Returns:
+        Dict: ข้อมูลมูลค่าคูปองและสถานะ (AVAILABLE, USED) หากไม่พบจะคืนค่า error
+    """
     try:
         # กรองข้อมูลจาก property rain_check
-        vouchers = [
-            {
-                "code": v.code, 
-                "amount": v.amount, 
-                "status": v.status.value
-            } for v in sys.find_raincheck(rain_check_code)
-        ]
-        return {"rain_check_code": rain_check_code, "vouchers": vouchers}
+        voucher = sys.find_raincheck(rain_check_code)
+        if not voucher:
+            return {"error": f"ไม่พบข้อมูล Rain Check รหัส {rain_check_code}"}
+        return {
+                    "rain_check_code": rain_check_code, 
+                    "vouchers": [{
+                        "code": voucher.code, 
+                        "amount": voucher.amount, 
+                        "status": voucher.status.value
+                    }]
+        }
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": f"System Error: {str(e)}"}
     
 @mcp.tool()
 def pay_booking(booking_id: str, rain_check_code = None):
     """
-    ยืนยันการชำระเงินสำหรับการจองสนาม 
-    เมื่อสำเร็จจะเปลี่ยนสถานะ Booking เป็น CONFIRMED
+    [User] ดำเนินการชำระเงินสำหรับการจองสนาม (Booking) เพื่อเปลี่ยนสถานะจาก PENDING เป็น CONFIRMED
+    
+    Args:
+        booking_id (str): รหัสการจองที่ต้องการจ่ายเงิน (เช่น 'BK-001')
+        rain_check_code (Optional[str]): รหัสคูปอง Rain Check หากต้องการใช้เป็นส่วนลดเพิ่มเติม
+        
+    Note:
+        - ระบบจะคำนวณราคาสุทธิโดยหักส่วนลดตาม Tier ของสมาชิกและคูปองอัตโนมัติ
+        - เมื่อสำเร็จ สถานะ Booking จะเปลี่ยนเป็น CONFIRMED_PAID และส่ง Notification หาผู้ใช้
     """
     try:
         # 2. ค้นหาการจอง
@@ -65,7 +83,7 @@ def pay_booking(booking_id: str, rain_check_code = None):
 
 @mcp.tool()
 def view_payment_history(user_id: str):
-    """ดูประวัติการชำระเงินทั้งหมดของผู้ใช้"""
+    """ดูประวัติการชำระเงินทั้งหมดของสมาชิก (ทั้งค่าจองสนามและค่าสมัครทัวร์นาเมนต์)"""
     try:
         user = sys.find_user(user_id)
         if not user:
@@ -74,12 +92,12 @@ def view_payment_history(user_id: str):
         history = []
         for p in sys.payments:
             # กรองเฉพาะ payment ที่เกี่ยวข้องกับ user นี้ (ตรวจสอบจาก ID หรือข้อมูลอ้างอิง)
-            if user_id in p.id: 
+            if p.member and p.member.id == user_id:
                 history.append({
                     "payment_id": p.payment_id,
                     "amount": p.amount,
                     "status": p.status.value,
-                    "date": p.time
+                    "date": getattr(p, 'time', 'N/A')
                 })
         return {"user": user.name, "payment_history": history}
     except Exception as e:
@@ -87,27 +105,40 @@ def view_payment_history(user_id: str):
 
 @mcp.tool()
 def view_bookings(): 
-    """ดูรายการจองทั้งหมด พร้อมรายละเอียดราคาและสถานะ"""
+    """
+    [Admin] ดูรายการจอง (Booking) ทั้งหมดในระบบ พร้อมรายละเอียดราคาและสถานะปัจจุบัน
+    """
     bookings_list = []
     for b in sys.bookings:
-        # เรียกใช้โดยไม่ต้องส่ง rain_check (เพราะใน view ปกติจะยังไม่มีการใช้คูปอง)
-        # ตรวจสอบให้แน่ใจว่าใน booking.py กำหนด def calculate_total_price(self, rain_check=None):
         total_price, breakdown = b.calculate_total_price() 
         
+        # 🌟 แปลง Add-on Object เป็น Dictionary ที่อ่านง่าย
+        formatted_addons = []
+        for addon in b.get_all_addons:
+            if hasattr(addon, 'level'): # กรณีแคดดี้
+                formatted_addons.append({"type": "CADDY", "id": addon.id, "name": addon.name, "price": addon.price})
+            elif hasattr(addon, 'type'): # กรณีรถกอล์ฟ
+                formatted_addons.append({"type": "CART", "id": addon.id, "cart_type": addon.type.value, "price": addon.price})
+            elif hasattr(addon, 'order_id'): # กรณีสั่งสินค้า
+                formatted_addons.append({"type": "ORDER", "id": addon.order_id, "price": addon.price})
+
         bookings_list.append({
             "id": b.booking_id, 
-            "name": b.requester.id, 
-            "price": total_price, 
+            "group_leader": b.requester.id, # 🌟 ระบุชัดเจนว่าใครเป็นคนจ่าย
+            "total_group_price": total_price, 
             "slot": b.slot.time, 
             "status": b.status.value, 
-            "addons": [str(addon) for addon in b.get_all_addons], # แปลงเป็น string เพื่อให้ JSON อ่านง่าย
+            "addons": formatted_addons, # 🌟 ใช้ตัวแปรที่ format แล้ว
             "orders": len(b.orders), 
-            "Transaction": breakdown
+            "Transaction_Receipt": breakdown
         })
     return {"booking": bookings_list}
 
 @mcp.tool()
 def view_products():
+    """
+    [User] ตรวจสอบรายการสินค้า อาหาร และบริการ พร้อมราคาและจำนวนคงเหลือในสต็อก
+    """
         # เรียกใช้ p.id, p.name, p.price แบบ property ตาม system.py
     products_list = [
         {"id": p.id, "name": p.name, "price": p.price, "remaining_stock": p.stock} 
@@ -118,7 +149,14 @@ def view_products():
 
 @mcp.tool()
 def place_order(booking_id: str, product_id: str, quantity: int):
-    """ใช้สั่งซื้อสินค้าเข้าไปในรายการจอง (หักสต็อกอัตโนมัติ)"""
+    """
+    [User] สั่งซื้อสินค้า/อาหารเข้าสู่รายการจอง (หักสต็อกอัตโนมัติ)
+    
+    Args:
+        booking_id (str): รหัสการจองที่ต้องการสั่งสินค้า (เช่น 'BK-001')
+        product_id (str): รหัสสินค้า (เช่น 'P-001')
+        quantity (int): จำนวนที่ต้องการสั่ง
+    """
     try:
         # เรียกใช้ logic การสั่งซื้อจาก system.py
         result = sys.place_order(booking_id, product_id, quantity)
@@ -128,10 +166,22 @@ def place_order(booking_id: str, product_id: str, quantity: int):
 
 @mcp.tool()
 def create_golf_booking(member_id: str, course_id: str, date: str, time: str, companions: list[str] = None):
-    """ใช้จองเวลาออกรอบสนามกอล์ฟ (รองรับเพื่อนร่วมก๊วน และล็อก Slot ทันที)
-    :param date: วันที่ต้องการจอง **ต้องใช้รูปแบบ DD-MM-YYYY เท่านั้น** (เช่น 12-03-2026)
-    :param time: เวลาที่ต้องการจอง รูปแบบ HH:MM (เช่น 08:00)
     """
+    [User] สร้างรายการจองสนามกอล์ฟใหม่ (Tee-off Booking)
+    
+    Args:
+        member_id (str): ID ของผู้จอง (เช่น 'M-001')
+        course_id (str): ID ของสนาม (เช่น 'C-001', 'C-002')
+        date (str): วันที่ต้องการจอง **รูปแบบ DD-MM-YYYY เท่านั้น** (เช่น '25-12-2026')
+        time (str): เวลาที่ต้องการจอง รูปแบบ HH:MM (เช่น '08:00')
+        companions (Optional[list[str]]): รายชื่อ ID ของเพื่อนร่วมก๊วน (รวมผู้จองต้องไม่เกิน 4 คน)
+        
+    Constraint:
+        - Member จองล่วงหน้าได้ตาม Tier limit (Platinum 30 วัน, Gold 14 วัน, Silver 7 วัน)
+        - Guest (Walk-in) จองได้เฉพาะวันปัจจุบันเท่านั้น
+        - ระบบจะล็อก Slot สนามทันทีเป็นสถานะ RESERVED
+    """
+    
     try:
         # เรียกใช้ create_booking ที่มีการจำกัด 4 คนและล็อก Slot
         new_booking = sys.create_booking(member_id, course_id, date, time, companions)
@@ -151,18 +201,32 @@ def select_booking_addons(
     random_caddy_count: int,
     cart_type: Optional[str],
     cart_count: int
-) -> str:
+):
+    """
+    [User] เลือกแคดดี้และรถกอล์ฟเพิ่มเติมสำหรับการจองที่สร้างไว้แล้ว
+    
+    Args:
+        booking_id (str): รหัสการจอง (เช่น 'BK-001')
+        specific_caddies (list[str]): รายชื่อ ID แคดดี้ที่ต้องการระบุเจาะจง (เช่น ['CDY-001'])
+        random_caddy_level (Optional[str]): ระดับแคดดี้กรณีต้องการสุ่ม (PRO, REGULAR, TRAINEE)
+        random_caddy_count (int): จำนวนแคดดี้ที่ต้องการสุ่มเพิ่ม
+        cart_type (Optional[str]): ประเภทรถกอล์ฟ (STANDARD, COUPLE, VIP)
+        cart_count (int): จำนวนรถกอล์ฟที่ต้องการเช่า
+        
+    Requirement:
+        - จำนวนแคดดี้รวม (เจาะจง + สุ่ม) ต้องเท่ากับจำนวนนักกอล์ฟในก๊วนพอดี (1 คนต่อ 1 แคดดี้)
+    """
     try:
         booking = sys.find_booking(booking_id)
         if not booking:
-            raise ValueError(f"Error: ไม่พบข้อมูลการจองรหัส {booking_id}")
+            return {"error": f"ไม่พบข้อมูลการจองรหัส {booking_id}"}
 
         # 1. ตรวจสอบจำนวนผู้เล่นจริงใน Booking Object 
         total_golfers = len(booking.golfers) 
         total_requested_caddies = len(specific_caddies) + random_caddy_count
         
         if total_requested_caddies != total_golfers:
-            raise ValueError(f"Error: จำนวนแคดดี้ไม่ถูกต้อง ก๊วนนี้มี {total_golfers} คน (รวมผู้จอง) ต้องจองแคดดี้ให้ครบ {total_golfers} ท่าน")
+            return {"error": f"จำนวนแคดดี้ไม่ถูกต้อง ก๊วนนี้มี {total_golfers} คน ต้องจองแคดดี้ให้ครบ {total_golfers} ท่าน"}
 
         booking.clear_addons()
 
@@ -219,7 +283,7 @@ def select_booking_addons(
                     available_carts.remove(cart)
                     assigned_details.append(f"รถกอล์ฟ: {cart.id} ({cart.type.value})")
 
-        return f"ยืนยัน Add-ons สำเร็จสำหรับ {booking_id}:\n" + "\n".join(assigned_details)
+        return {"message": f"ยืนยัน Add-ons สำเร็จสำหรับ {booking_id}:\n" + "\n".join(assigned_details)}
 
     except Exception as e:
         return {"error": str(e)}
@@ -227,11 +291,23 @@ def select_booking_addons(
 
 @mcp.tool()
 def view_transaction(booking_id: str):
-    """ดูรายละเอียดการคำนวณราคาสุทธิของการจอง รวมถึงส่วนประกอบต่างๆ ที่นำมาคิดราคา"""
+    """
+    [User] ตรวจสอบรายละเอียดราคาสุทธิ การคำนวณส่วนลด และค่าใช้จ่ายทั้งหมดของรายการจอง
+    """
+
     try:
         booking = sys.find_booking(booking_id)
         if not booking:
             return {"error": f"ไม่พบข้อมูลการจองรหัส {booking_id}"}
+        
+        if booking.status.value == "CONFIRMED_PAID":
+            payment = next((p for p in sys.payments if p.booking_id == booking_id), None)
+            if payment and payment.get_transaction_details():
+                return {
+                    "booking_id": booking_id,
+                    "total_price": payment.amount,
+                    "price_breakdown": payment.get_transaction_details()
+                }
         
         total_price, breakdown = booking.calculate_total_price()
         return {
@@ -239,12 +315,13 @@ def view_transaction(booking_id: str):
             "total_price": total_price,
             "price_breakdown": breakdown
         }
+        
     except Exception as e:
         return {"error": str(e)}
     
 @mcp.tool()
 def view_all_caddies():
-    """แสดงรายชื่อแคดดี้ทั้งหมดในระบบ พร้อมระดับ (Level) และค่าบริการ"""
+    """[User/Admin] แสดงรายชื่อแคดดี้ทั้งหมด พร้อมระดับและราคาบริการ"""
     try:
         # ดึงข้อมูลผ่าน property caddies ใน system.py
         caddy_list = [
@@ -278,7 +355,7 @@ def view_all_available_caddies(date: str, time: str):
 
 @mcp.tool()
 def view_all_golf_carts():
-    """แสดงรายการรถกอล์ฟทั้งหมด พร้อมประเภทและราคาเช่า"""
+    """[User/Admin] แสดงรายการรถกอล์ฟทั้งหมดที่มีในระบบและราคาเช่า"""
     try:
         # ดึงข้อมูลผ่าน property carts ใน system.py
         cart_list = [
@@ -311,7 +388,13 @@ def admin_view_all_payments():
 
 @mcp.tool()
 def view_available_slots(course_id: str, date: str):
-    """ใช้ตรวจสอบเวลาที่ยังว่างอยู่ของสนามในวันที่ระบุ"""
+    """
+    [User] ตรวจสอบเวลาว่าง (Available Slots) ของสนามกอล์ฟในวันที่ระบุ
+    
+    Args:
+        course_id (str): ID สนาม (เช่น 'C-001')
+        date (str): วันที่ **รูปแบบ DD-MM-YYYY เท่านั้น**
+    """
     try:
         course = sys.find_course(course_id)
         if not course:
@@ -332,7 +415,7 @@ def view_available_slots(course_id: str, date: str):
 
 @mcp.tool()
 def view_all_courses():
-    """แสดงรายชื่อสนามทั้งหมด พร้อมเรทราคาและความยาก (Rating/Slope)"""
+    """[User] แสดงรายชื่อสนามกอล์ฟทั้งหมด พร้อมข้อมูลเรทราคาและความยาก"""
     try:
         courses = sys.get_all_courses
         if not courses:
@@ -361,7 +444,7 @@ def view_all_courses():
 
 @mcp.tool()
 def view_tournaments():
-    """ดูรายการแข่งขันที่มีในระบบ สถานะ และจำนวนผู้สมัคร"""
+    """[User] ดูรายการแข่งขัน (Tournament) ทั้งหมด สถานะการรับสมัคร และค่าธรรมเนียม"""
     try:
         t_list = [{
             "id": t.id,
@@ -375,55 +458,15 @@ def view_tournaments():
     except Exception as e:
         return {"error": str(e)}
 
-# @mcp.tool()
-# def register_tournament(member_id: str, tour_id: str):
-#     """
-#     สมัครเข้าแข่งขันในทัวร์นาเมนต์โดยตรง (ไม่จำเป็นต้องมีการจองสนามก่อน)
-#     ระบบจะทำการหักค่าธรรมเนียมและเพิ่มชื่อเข้าสู่รายชื่อผู้แข่งขันทันที
-#     """
-#     try:
-#         # 1. ค้นหาออบเจกต์ Member และ Tournament จากระบบ
-#         member = sys.find_user(member_id)
-#         if not member: raise ValueError(f"ไม่พบข้อมูลสมาชิก ID {member_id}")
-#         tour = sys.find_tournament(tour_id)
-#         if not tour : raise ValueError(f"ไม่พบข้อมูลทัวร์นาเมนต์ ID {tour_id}")
-#         # 2. ตรวจสอบสถานะว่าทัวร์นาเมนต์ยังเปิดรับสมัครอยู่หรือไม่
-#         # โดยเช็คจาก TournamentStatus.REGISTRATION_OPEN
-#         if tour.status.value != "REGISTRATION_OPEN":
-#             return {"error": f"ทัวร์นาเมนต์ {tour.name} ปิดรับสมัครแล้ว หรือยังไม่เปิดให้ลงชื่อ"}
-
-#         # 3. ตรวจสอบว่าสมาชิกคนนี้สมัครไปแล้วหรือยัง เพื่อป้องกันข้อมูลซ้ำ
-#         if member in tour.registered_players:
-#             return {"error": f"สมาชิก {member.name} ได้สมัครทัวร์นาเมนต์นี้เรียบร้อยแล้ว"}
-
-
-#         # 5. เพิ่มสมาชิกเข้าสู่ทัวร์นาเมนต์
-#         # ฟังก์ชัน add_player จะทำการสร้าง Scorecard ให้สมาชิกโดยอัตโนมัติ
-#         tour.add_player(member)
-
-#         # 6. ส่งการแจ้งเตือนไปยังสมาชิก
-#         msg = f"สมัครทัวร์นาเมนต์ {tour.name} สำเร็จ! ชำระค่าธรรมเนียม {entry_fee:,.2f} บาท เรียบร้อยแล้ว"
-#         member.add_notification(Notification(msg))
-
-#         return {
-#             "status": "Success",
-#             "message": msg,
-#             "details": {
-#                 "tournament": tour.name,
-#                 "player": member.name,
-#                 "fee_paid": entry_fee,
-#                 "payment_id": payment.paymentID
-#             }
-#         }
-
-#     except Exception as e:
-#         # กรณีไม่พบ user_id หรือ tour_id ระบบจะ raise error จาก find_user/find_tournament
-#         return {"error": str(e)}
-
-    
 @mcp.tool()
 def apply_for_tournament(member_id: str, tour_id: str):
-    """ใช้สมัครทัวร์นาเมนต์เพื่อจองสิทธิ์ไว้ก่อน (ยังไม่ต้องจ่ายเงินทันที)"""
+    """
+    [User] สมัครเข้าร่วมการแข่งขัน (สถานะจะเป็น PENDING จนกว่าจะชำระเงิน)
+    
+    Args:
+        member_id (str): ID สมาชิก (เช่น 'M-001')
+        tour_id (str): ID ทัวร์นาเมนต์ (เช่น 'T-001')
+    """
     try:
         p_id = sys.register_tournament_pending(member_id, tour_id)
         return {
@@ -437,7 +480,7 @@ def apply_for_tournament(member_id: str, tour_id: str):
 
 @mcp.tool()
 def pay_tournament_fee(payment_id: str):
-    """ยืนยันการชำระเงินสำหรับทัวร์นาเมนต์ที่สมัครไว้"""
+    """[User] ยืนยันการชำระเงินค่าสมัครทัวร์นาเมนต์โดยใช้รหัส Payment ID"""
     try:
         if sys.confirm_tournament_payment(payment_id):
             return {"status": "SUCCESS", "message": "ชำระเงินเรียบร้อย สิทธิ์การแข่งของคุณยืนยันแล้ว"}
@@ -476,7 +519,7 @@ def admin_create_tournament(name: str, date: str, fee: float, course_id: str):
 
 @mcp.tool()
 def admin_publish_draw(tour_id: str):
-    """[Admin Only] ปิดรับสมัครและจัดกลุ่มก๊วนแข่ง (Pairing) พร้อมส่งการแจ้งเตือน"""
+    """[Admin Only] ปิดรับสมัครและจัดกลุ่มก๊วน (Pairing) พร้อมกำหนดเวลา Tee-off"""
     try:
         result = sys.close_registration_and_pairing(tour_id)
         return {"message": result}
@@ -485,17 +528,25 @@ def admin_publish_draw(tour_id: str):
 
 @mcp.tool()
 def admin_start_tournament(tour_id: str):
-    """[Admin Only] เริ่มการแข่งขันอย่างเป็นทางการ"""
+    """[Admin Only] เปลี่ยนสถานะทัวร์นาเมนต์เป็น IN_PROGRESS เพื่อเริ่มบันทึกคะแนน"""
     try:
         tour = sys.find_tournament(tour_id)
-        tour.status(TournamentStatus.IN_PROGRESS)
+        tour.update_status(TournamentStatus.IN_PROGRESS)
         return {"message": f"Tournament {tour.name} has started!"}
     except Exception as e:
         return {"error": str(e)}
 
 @mcp.tool()
 def record_tournament_score(tour_id: str, member_id: str, hole: int, stroke: int):
-    """บันทึกคะแนนการตีรายหลุม (ตรวจสอบสิทธิ์และสถานะงานแข่งอัตโนมัติ)"""
+    """
+    [Admin/Staff] บันทึกคะแนนการตี (Strokes) ของผู้เล่นรายหลุม
+    
+    Args:
+        tour_id (str): ID ทัวร์นาเมนต์
+        member_id (str): ID ผู้เล่น
+        hole (int): หมายเลขหลุม (1-18)
+        stroke (int): จำนวนครั้งที่ตี
+    """
     try:
         result = sys.record_tournament_score(tour_id, member_id, hole, stroke)
         return result
@@ -504,7 +555,7 @@ def record_tournament_score(tour_id: str, member_id: str, hole: int, stroke: int
 
 @mcp.tool()
 def view_leaderboard(tour_id: str):
-    """ดูตารางสรุปคะแนน (Leaderboard) แบบ Real-time"""
+    """[User/Admin] ดูตารางคะแนนสด (Real-time Leaderboard) ของทัวร์นาเมนต์ที่กำลังแข่ง"""
     try:
         result = sys.get_tournament_leaderboard(tour_id)
         return result
@@ -513,7 +564,7 @@ def view_leaderboard(tour_id: str):
 
 @mcp.tool()
 def admin_end_tournament(tour_id: str):
-    """[Admin Only] ปิดงานแข่ง, คำนวณ Handicap ใหม่ และอัปเดตประวัติผู้เล่น"""
+    """[Admin Only] จบการแข่งขัน คำนวณ Handicap ใหม่ และสรุปผลเข้าระบบประวัติผู้เล่น"""
     try:
         result = sys.end_tournament(tour_id)
         return result
@@ -523,17 +574,20 @@ def admin_end_tournament(tour_id: str):
 @mcp.tool()
 def issue_rain_check(user_id: str) -> str:
     """
-    เครื่องมือสำหรับออกคูปอง Rain Check ให้แก่ผู้เล่น (Golfer) 
-    ระบบจะสร้างรหัสคูปองอัตโนมัติและส่งการแจ้งเตือนหากเป็นสมาชิก (Member)
+    [Admin Only] ออกคูปอง Rain Check ให้แก่ผู้เล่น (กรณีฝนตกสนามเล่นไม่ได้)
+    ระบบจะคำนวณมูลค่าคูปองให้อัตโนมัติ (25% ของยอดสุทธิการจอง)
+    
+    Args:
+        user_id (str): ID สมาชิกที่จะได้รับคูปอง (เช่น 'M-001')
     """
     try:
         booking = sys.find_booking_by_member(user_id) # สมมติว่ามี method นี้เพื่อเช็คว่าผู้ใช้มีการจองที่เกี่ยวข้องหรือไม่
         if not booking:
             raise ValueError("Error: ผู้ใช้ไม่พบหรือไม่ได้ทำการจอง")
-        amount , _ = booking.calculate_total_price() # สมมติว่าให้คูปองมูลค่า 50% ของราคาสุทธิการจอง
+        total_price, _ = booking.calculate_total_price()
         # 2. เรียกใช้งาน Method จาก GreenValleySystem
-        new_rc = sys.issue_raincheck_to_user(user_id, float(amount) * 0.25)
-
+        calculated_amount = float(total_price) * 0.25
+        new_rc = sys.issue_raincheck_to_user(user_id, calculated_amount)
         if new_rc:
             # คืนค่าเป็น String เพื่อให้ AI นำไปแจ้งผู้ใช้ต่อได้
             return (f"ออกคูปองสำเร็จ!\n"
@@ -554,7 +608,7 @@ def get_user_rainchecks(user_id: str):
     try:
         user = sys.find_user(user_id)
         if not user:
-            raise ValueError("ไม่พบผู้ใช้งาน") 
+            return {"error": "ไม่พบผู้ใช้งาน"}
         
         # กรองข้อมูล Rain Check ที่ผูกกับเบอร์โทรศัพท์ของผู้ใช้
         rainchecks = [
@@ -562,9 +616,52 @@ def get_user_rainchecks(user_id: str):
                 "code": rc.code,
                 "amount": rc.amount,
                 "status": rc.status.value
-            } for rc in sys.rain_check if rc.phone == user.phone
+            } for rc in sys.rain_checks if rc.phone == getattr(user, 'phone', None)
         ]
         return {"user": user.name, "rainchecks": rainchecks}
+    except Exception as e:
+        return {"error": str(e)}
+    
+# เพิ่มลงใน mcp_server.py ในหมวด Admin Management
+
+@mcp.tool()
+def admin_add_strike(user_id: str, reason: str, count: int = 1):
+    """
+    [Admin Only] ลงโทษสมาชิกด้วยการเพิ่ม Strike กรณีทำผิดกฎสนาม (เช่น No-show หรือเล่นล่าช้า)
+    
+    Args:
+        user_id (str): ID ของสมาชิกที่ต้องการลงโทษ (เช่น 'M-001')
+        reason (str): เหตุผลในการลงโทษ (เพื่อใช้ในการบันทึก log)
+        count (int): จำนวน Strike ที่จะเพิ่ม (ค่าเริ่มต้นคือ 1)
+        
+    Penalty Logic:
+        - 2 Strikes: ระงับสิทธิ์การจองวันเสาร์-อาทิตย์เป็นเวลา 30 วัน (WEEKEND_BAN)
+        - 3 Strikes: ระงับสิทธิ์การใช้งานถาวร/ชั่วคราว 60 วัน (BANNED)
+    """
+    try:
+        # เรียกใช้งานผ่าน Controller (GreenValleySystem)
+        result = sys.admin_strike_user(user_id, count)
+        
+        # เพิ่มข้อมูลเหตุผลเข้าไปในผลลัพธ์เพื่อให้ AI ตอบผู้ใช้ได้ครบถ้วน
+        result["reason"] = reason
+        return result
+        
+    except Exception as e:
+        return {"error": str(e)}
+    
+@mcp.tool()
+def admin_clear_user_strikes(user_id: str):
+    """
+    [Admin Only] ล้างจำนวน Strike ทั้งหมดของผู้เล่น และปรับสถานะกลับเป็น ACTIVE
+    ใช้ในกรณีที่ต้องการยกเลิกการแบน หรือแอดมินพิจารณาคืนสิทธิ์ให้ผู้เล่น
+    """
+    try:
+        user = sys.find_user(user_id)
+        if not hasattr(user, 'reset_strikes'):
+            return {"error": "ผู้ใช้ประเภทนี้ไม่มีระบบ Strike"}
+            
+        msg = user.reset_strikes() # เรียกใช้ logic ล้างโทษ
+        return {"message": f"ดำเนินการสำเร็จสำหรับ {user.name}", "details": msg}
     except Exception as e:
         return {"error": str(e)}
     

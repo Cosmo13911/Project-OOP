@@ -69,11 +69,19 @@ class Golfer(User):
         self.__history = []
         self.__strikes = 0
         self.__raincheck = []
+        self.__status = UserStatus.ACTIVE
+
+    @property
+    def status(self): 
+        return self.__status
+
     @property
     def current_handicap(self): return self.__current_handicap
+
     @property
     def history(self):
         return self.__history
+    
     @property
     def get_raincheck(self):
         return self.__raincheck
@@ -81,15 +89,24 @@ class Golfer(User):
     def add_raincheck(self, rain_check):
         self.__raincheck.append(rain_check)
     
-    def add_srike(self, number: int):
-        self.__strikes += number
+    def add_strike(self, number: int):
+        self.__strikes += int(number)
         now = datetime.now()
-        if self.__strikes == 2:
-            self.__weekend_ban_until = now + timedelta(days=30)
-            self.__status = UserStatus.WEEKEND_BAN
-        elif self.__strikes >= 3:
+        
+        if self.__strikes >= 3:
             self.__suspended_until = now + timedelta(days=60)
             self.__status = UserStatus.BANNED
+        elif self.__strikes >= 2:
+            self.__weekend_ban_until = now + timedelta(days=30)
+            self.__status = UserStatus.WEEKEND_BAN
+        else:
+            self.__status = UserStatus.ACTIVE
+        return self.__strikes 
+    
+    def reset_strikes(self):
+        self.__strikes = 0
+        self.__status = UserStatus.ACTIVE
+        return "Strikes have been reset to 0 and status is now ACTIVE."
 
     # 🌟 ฟังก์ชันเสริม: เอาไว้รับคะแนนจาก sc__score_card มาใส่ประวัติ
     def add_history(self, score_card_instance, round_type="General"):
@@ -99,16 +116,6 @@ class Golfer(User):
         self.calculate_handicap()
         return (f"Added {round_type} round to history and updated handicap.")
 
-    def add_strike(self,number:int):
-        self.__strikes += number
-        now = datetime.now()
-        if self.__strikes == 2:
-            self.__weekend_ban_until = now + timedelta(days=30)
-            self.__status = UserStatus.WEEKEND_BAN
-        elif self.__strikes >= 3:
-            self.__suspended_until = now + timedelta(days=60)
-            self.__status = UserStatus.BANNED
-                    
     def calculate_handicap(self):
         if len(self.__history) < 1:
             return self.__current_handicap
@@ -178,13 +185,8 @@ class Member(Golfer):
     def __init__(self, user_id: str, name: str, phone: str, tier: Tier = Tier.SILVER, handicap: float = 0.0):
         super().__init__(user_id, name, phone, handicap)
         self.__tier = tier
-        self.__status = UserStatus.ACTIVE
         self.__notifications = []
 
-    @property
-    def tier(self): return self.__tier
-    @property
-    def status(self): return self.__status
     @property
     def tier(self): return self.__tier
 

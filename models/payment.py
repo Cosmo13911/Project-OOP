@@ -1,8 +1,10 @@
+import uuid
 from datetime import datetime
 from models.enum import PaymentStatus, RainCheckStatus, TournamentStatus
 
 class Payment:
     def __init__(self, amount, member, transaction = None, booking_id=None, tournament_id=None):
+        unique_suffix = str(uuid.uuid4())[:6].upper()
         self.__payment_id = f"PAY-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         self.__amount = amount
         self.__booking_id = booking_id
@@ -12,7 +14,8 @@ class Payment:
         self.__status = PaymentStatus.PENDING
         self.__transaction = transaction
         self.__time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
+    @property
+    def member(self): return self.__member
     @property
     def payment_id(self): return self.__payment_id
     @property
@@ -24,6 +27,8 @@ class Payment:
     @property
     def get_type(self):
         return self.__type
+    @property
+    def booking_id(self): return self.__booking_id
     
     def set_status(self, new_status):
         self.__status = new_status
@@ -58,6 +63,6 @@ class Raincheck:
         def status(self):
             return self.__status
 
-        @property
+        
         def set_status(self, new_status):
             self.__status = new_status
