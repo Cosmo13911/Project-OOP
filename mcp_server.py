@@ -3,7 +3,7 @@ from system import GreenValleySystem
 from models.enum import TournamentStatus, SlotStatus 
 from models.booking import Booking
 from models.payment import Payment, Raincheck
-from models.enum import Tier, Booking_day_limit
+from models.enum import Tier
 from models.users import Member, Guest
 from typing import List, Optional
 from datetime import datetime
@@ -222,7 +222,7 @@ def select_booking_addons(
         return f"ยืนยัน Add-ons สำเร็จสำหรับ {booking_id}:\n" + "\n".join(assigned_details)
 
     except Exception as e:
-        return f"System Error: {str(e)}"
+        return {"error": str(e)}
     
 
 @mcp.tool()
@@ -481,7 +481,7 @@ def admin_publish_draw(tour_id: str):
         result = sys.close_registration_and_pairing(tour_id)
         return {"message": result}
     except Exception as e:
-        return {"errsdjfdsfoisjfojor": str(e)}
+        return {"error": str(e)}
 
 @mcp.tool()
 def admin_start_tournament(tour_id: str):
@@ -544,7 +544,7 @@ def issue_rain_check(user_id: str) -> str:
             raise ValueError("Error: ไม่สามารถออกคูปองได้ (ผู้ใช้อาจไม่ใช่ Golfer หรือไม่พบข้อมูล)")
 
     except Exception as e:
-        return f"System Error: เกิดข้อผิดพลาดทางเทคนิค - {str(e)}"
+        return {"error": str(e)}
 
 # Rain Check Old Version 13/3/2026 02:53
 @mcp.tool()

@@ -386,7 +386,7 @@ class GreenValleySystem:
         diff_days = (target_date - now).days
 
         # ใช้ .tier เพราะเราทำ encapsulation ไว้ในไฟล์ users.py แล้ว
-        limit = user.tier.booking_day_limit.day_limit
+        limit = user.tier.booking_day_limit
         if diff_days > limit:
             raise ValueError(f"{user.name} ({user.tier.name}) can only book up to {limit} days in advance. You tried to book {diff_days} days ahead.")
         
@@ -436,7 +436,7 @@ class GreenValleySystem:
                 raise ValueError("Guest (Walk-in) สามารถจองได้เฉพาะภายในวันนี้เท่านั้น")
         elif isinstance(requester, Member):
             # ตรวจสอบ limit ตาม Tier (สูงสุด 30 วันตามกฎใหม่)
-            limit = requester.tier.booking_day_limit.day_limit 
+            limit = requester.tier.booking_day_limit
             if diff_days > limit:
                 raise ValueError(f"สมาชิก Tier {requester.tier.name} จองล่วงหน้าได้สูงสุด {limit} วัน (คุณพยายามจองล่วงหน้า {diff_days} วัน)")
         
@@ -524,11 +524,21 @@ class GreenValleySystem:
         course = self.find_course(course_id)
         if not course:
             raise ValueError(f"Course with ID {course_id} not found")
-                    
+        for b in self.__bookings:
+            if b.slot.course.id == course_id and b.slot.play_date == date:
+                if b.status != BookingStatus.CANCELLED:
+                    raise ValueError(f"ไม่สามารถสร้าง Tournament ได้ เนื่องจากมีการจองเวลาของผู้ใช้ในวันที่ {date} แล้ว")            
         t_id = f"T-{len(self.__tournaments) + 1:03d}"
         new_tour = Tournament(t_id, name, date, fee, course)
         self.__tournaments.append(new_tour)
         return {"tournamentID": t_id, "course_assigned": course.name}
+
+    def is_tournament_day(self, course_id: str, date: str) -> bool:
+        """ตรวจสอบว่าสนามที่ระบุในวันที่ระบุ มี Tournament หรือไม่"""
+        for tour in self.__tournaments:
+            if tour.course.id == course_id and tour.date == date:
+                return True
+        return False
 
     def process_payment(self, booking: Booking, tour: Tournament = None, member: Member = None, rain_check_code: str = None):
         # 1. แยกส่วนประกอบของรหัส Payment        
@@ -555,7 +565,7 @@ class GreenValleySystem:
 
             
             # [เพิ่ม] การแจ้งเตือนการชำระเงินเสร็จสิ้น
-            msg = f"Payment Successful! [{payment.get_type}] is confirmed."
+            msg = f"Payment Successful! [{payment.get_type}] is confirmed. Amount: {payment.amount:,.2f} THB"
             member.add_notification(Notification(msg))     
 
             return {"status": "SUCCESS", "message": msg}
