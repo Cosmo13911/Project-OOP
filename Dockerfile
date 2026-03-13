@@ -10,5 +10,7 @@ COPY mcp_server.py .
 # copy all files
 COPY . .
 
+RUN chmod -R 755 /app
+
 #ren mcp server
 CMD ["python", "mcp_server.py"]
