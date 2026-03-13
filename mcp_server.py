@@ -50,7 +50,7 @@ def pay_booking(booking_id: str, rain_check_code = None):
 
         # 4. ดำเนินการชำระเงิน (เรียกใช้ process_payment ใน system)
         payment_result = sys.process_payment(booking = booking, rain_check_code = rain_check_code)
-        return payment_result
+    
         # 5. อัปเดตสถานะการจองเป็น CONFIRMED (ถ้าชำระเงินสำเร็จ)
         if payment_result:
             return {

@@ -92,7 +92,6 @@ class Booking:
         
         # หักลบ Rain Check (ถ้ามี)
         if rain_check_amount:
-            return {"rain", rain_check_amount}
             total -= rain_check_amount
         else:
             rain_check_amount = 0.0

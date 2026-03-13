@@ -34,6 +34,16 @@ class GreenValleySystem:
     def bookings(self): return self.__bookings
     @property
     def tournaments(self): return self.__tournaments
+    @property
+    def get_all_courses(self): return self.__courses
+    @property
+    def caddies(self): return self.__caddies
+    @property
+    def carts(self): return self.__carts
+    @property
+    def rain_checks(self): return self.__rain_checks
+    @property
+    def payments(self): return self.__payments
     
 # กำหนด Format ที่เป็นไปได้ทั้งหมด
     DATE_FORMATS = ["%d-%m-%Y", "%Y-%m-%d"] 
@@ -48,16 +58,6 @@ class GreenValleySystem:
                 continue
         raise ValueError(f"ไม่รองรับรูปแบบเวลา: {dt_str} กรุณาใช้ DD-MM-YYYY HH:MM หรือ YYYY-MM-DD HH:MM")
     
-    @property
-    def get_all_courses(self): return self.__courses
-    @property
-    def caddies(self): return self.__caddies
-    @property
-    def carts(self): return self.__carts
-    @property
-    def rain_checks(self): return self.__rain_checks
-    @property
-    def payments(self): return self.__payments
 
     def create_data(self):
         # 1. สร้างกลุ่มผู้ใช้ (Actors อย่างน้อย 2 กลุ่ม ตามข้อกำหนด [cite: 24])
@@ -518,7 +518,6 @@ class GreenValleySystem:
                     rain_check_amount = self.validate_and_use_raincheck(rain_check_code, member.phone)
                 else:
                     rain_check_amount = None
-                return booking.calculate_total_price(rain_check_amount)
             
                 total_price , msg = booking.calculate_total_price(rain_check_amount)
                 payment = Payment(total_price, member, booking_id=booking.booking_id, transaction=msg)
@@ -764,4 +763,5 @@ class GreenValleySystem:
         voucher = next((v for v in self.__rain_checks if v.code == code and v.phone == phone), None)
         if voucher:
             return voucher.amount
+        
         raise ValueError("Invalid Rain Check code or phone number")
