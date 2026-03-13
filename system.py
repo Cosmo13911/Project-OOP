@@ -517,7 +517,7 @@ class GreenValleySystem:
                 if rain_check_code:
                     rain_check_amount = self.validate_and_use_raincheck(rain_check_code, member.phone)
                 else:
-                    rain_check_amount = None
+                    rain_check_amount = 0.0
             
                 total_price , msg = booking.calculate_total_price(rain_check_amount)
                 payment = Payment(total_price, member, booking_id=booking.booking_id, transaction=msg)

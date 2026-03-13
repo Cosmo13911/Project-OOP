@@ -64,7 +64,7 @@ class Booking:
         self.__caddy.clear()
         self.__carts.clear()
 
-    def calculate_total_price(self, rain_check_amount=None):
+    def calculate_total_price(self, rain_check_amount):
         """
         Method หลักในการคำนวณราคาสุทธิของทั้งการจอง
         """
@@ -88,14 +88,8 @@ class Booking:
         addons_price = sum(addon.price for addon in self.get_all_addons)
         
         # 4. ยอดสุทธิรวมที่ผู้จองต้องจ่าย
-        total = total_course_fee + addons_price
+        total = total_course_fee + addons_price - rain_check_amount
         
-        # หักลบ Rain Check (ถ้ามี)
-        if rain_check_amount:
-            total -= rain_check_amount
-        else:
-            rain_check_amount = 0.0
-
         msg = {
                 "base_price_per_person": round(price_per_person, 2),
                 "individual_breakdown": details_msg,
