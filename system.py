@@ -71,7 +71,6 @@ class GreenValleySystem:
             ("M-006", "Jisoo", "081-666-6666", Tier.SILVER),
             ("M-007", "Rose", "081-777-7777", Tier.PLATINUM),
             ("M-008", "BamBam", "081-888-8888", Tier.GOLD)
-
         ]
 
         guest_data = [
@@ -87,6 +86,7 @@ class GreenValleySystem:
             ("P-004", "Iced Americano", 75, 100),
             ("P-005", "Thai Tea", 55, 100)
         ]
+
         # ===============================================
         # walk in na ja
         caddy_data = [
@@ -417,6 +417,33 @@ class GreenValleySystem:
         # 1. Normalization: แปลงวันที่ให้เป็นมาตรฐานเดียวกันก่อนทำงาน 
         dt_obj = self.robust_parse_datetime(f"{date} {time}")
         std_date = dt_obj.strftime("%d-%m-%Y")
+        target_date = dt_obj.date()
+        today = datetime.now().date()
+
+        # 2. กฎ: ห้ามจองวันในอดีต [ข้อกำหนดใหม่]
+        if target_date < today:
+            raise ValueError(f"ไม่สามารถจองย้อนหลังได้ (วันที่ระบุ: {target_date}, วันนี้: {today})")
+
+        # 3. ค้นหาข้อมูลผู้จองและสนาม 
+        requester = self.find_user(requester_id)
+        course = self.find_course(course_id)
+
+        # 4. กฎการจองล่วงหน้าแยกตามประเภทผู้ใช้ 
+        diff_days = (target_date - today).days
+
+        if isinstance(requester, Guest):
+            if target_date != today:
+                raise ValueError("Guest (Walk-in) สามารถจองได้เฉพาะภายในวันนี้เท่านั้น")
+        elif isinstance(requester, Member):
+            # ตรวจสอบ limit ตาม Tier (สูงสุด 30 วันตามกฎใหม่)
+            limit = requester.tier.booking_day_limit.day_limit 
+            if diff_days > limit:
+                raise ValueError(f"สมาชิก Tier {requester.tier.name} จองล่วงหน้าได้สูงสุด {limit} วัน (คุณพยายามจองล่วงหน้า {diff_days} วัน)")
+        
+        # 5. ตรวจสอบว่าวันนั้นมี Tournament หรือไม่ [ข้อกำหนดใหม่]
+        for tour in self.__tournaments:
+            if self.is_tournament_day(course_id, date):
+                raise ValueError(f"สนามนี้มีการจัดทัวร์นาเมนต์ในวันที่ {date} ขออภัยในความไม่สะดวก")
 
         # 2. Validation: ตรวจสอบจำนวนคนในก๊วน (รวมคนจองต้องไม่เกิน 4) 
         total_golfers_count = 1 + len(companion_ids)

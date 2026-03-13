@@ -546,6 +546,7 @@ def issue_rain_check(user_id: str) -> str:
     except Exception as e:
         return f"System Error: เกิดข้อผิดพลาดทางเทคนิค - {str(e)}"
 
+# Rain Check Old Version 13/3/2026 02:53
 @mcp.tool()
 def get_user_rainchecks(user_id: str):
     #test
