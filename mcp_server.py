@@ -35,7 +35,7 @@ def view_rain_checks(rain_check_code: str):
         return {"error": str(e)}
     
 @mcp.tool()
-def pay_booking(booking_id: str, rain_check_code : Optional[str] = None):
+def pay_booking(booking_id: str, rain_check_code = None):
     """
     ยืนยันการชำระเงินสำหรับการจองสนาม 
     เมื่อสำเร็จจะเปลี่ยนสถานะ Booking เป็น CONFIRMED
@@ -50,9 +50,9 @@ def pay_booking(booking_id: str, rain_check_code : Optional[str] = None):
 
         # 4. ดำเนินการชำระเงิน (เรียกใช้ process_payment ใน system)
         payment_result = sys.process_payment(booking = booking, rain_check_code = rain_check_code)
-        
+    
         # 5. อัปเดตสถานะการจองเป็น CONFIRMED (ถ้าชำระเงินสำเร็จ)
-        if "successfully" in payment_result:
+        if payment_result:
             return {
                 "message": f"ชำระเงินสำหรับการจอง {booking_id} สำเร็จ!",
                 "payment_details": payment_result,
@@ -532,7 +532,7 @@ def issue_rain_check(user_id: str) -> str:
             raise ValueError("Error: ผู้ใช้ไม่พบหรือไม่ได้ทำการจอง")
         amount , _ = booking.calculate_total_price() # สมมติว่าให้คูปองมูลค่า 50% ของราคาสุทธิการจอง
         # 2. เรียกใช้งาน Method จาก GreenValleySystem
-        new_rc = sys.issue_raincheck_to_user(user_id, amount * 0.25)
+        new_rc = sys.issue_raincheck_to_user(user_id, float(amount) * 0.25)
 
         if new_rc:
             # คืนค่าเป็น String เพื่อให้ AI นำไปแจ้งผู้ใช้ต่อได้

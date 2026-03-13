@@ -91,15 +91,17 @@ class Booking:
         total = total_course_fee + addons_price
         
         # หักลบ Rain Check (ถ้ามี)
-        rc = float(rain_check_amount) if rain_check_amount is not None else 0.0
-        total -= rc
+        if rain_check_amount:
+            total -= rain_check_amount
+        else:
+            rain_check_amount = 0.0
 
         msg = {
                 "base_price_per_person": round(price_per_person, 2),
                 "individual_breakdown": details_msg,
                 "total_course_fee": round(total_course_fee, 2),
                 "addons_price": round(addons_price, 2),
-                "rain_check_coupon": round(rc, 2),
+                "rain_check_coupon": round(rain_check_amount, 2),
                 "total_net_to_pay": round(total, 2), # ผู้จองจ่ายยอดนี้ยอดเดียว
                 "currency": "THB"
             }
