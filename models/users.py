@@ -117,7 +117,7 @@ class Golfer(User):
         return (f"Added {round_type} round to history and updated handicap.")
 
     def calculate_handicap(self):
-        if len(self.__history) < 1:
+        if len(self.__history) < 3:
             return self.__current_handicap
         
         recent_history = self.__history[-20:]
@@ -133,11 +133,11 @@ class Golfer(User):
 
         # 5. หาค่าเฉลี่ยตามจำนวนรอบที่มี (ตามเกณฑ์มาตรฐาน WHS)
         hi = 0.0
-        if num_scores == 1:
+        if num_scores == 3:
 
             hi = differentials[0] - 2.0
 
-        elif num_scores == 2:
+        elif num_scores == 4:
 
             hi = differentials[0] - 1.0
 
