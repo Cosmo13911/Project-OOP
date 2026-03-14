@@ -305,11 +305,6 @@ class GreenValleySystem:
                 return course
         raise ValueError(f"Course with ID {course_id} not found")
 
-    def find_available_carts(self, date, time):
-    
-        available = [cart for cart in self.__carts if cart.is_available(date, time)]
-        return available
-
     def find_tournament(self, tour_id: str):
         for tour in self.__tournaments:
             if tour.id == tour_id:
@@ -333,60 +328,10 @@ class GreenValleySystem:
             if product.id == product_id:
                 return product
         raise ValueError(f"Product with ID {product_id} not found")
-
-    
-    def find_available_caddies(self, date: str, time: str):
-        return [c for c in self.__caddies if c.is_available(date, time)]
-    
-    def find_available_carts(self, date: str, time: str):
-        return [c for c in self.__carts if c.is_available(date, time)]
-        
-    def find_payment_by_id(self, paymentID):
-        return next((p for p in self.__payments if p.payment_id == paymentID), None)
-
+ 
     def find_raincheck(self, rain_check_code: str):
         return next((rc for rc in self.__rain_checks if rc.code == rain_check_code), None)
-    
-    def get_course_by_type(self, course_type):
-        return next((c for c in self.__courses if c.type == course_type), None)
 
-    def check_booking_lead_time(self, user, date_str: str):
-        now = datetime.now().date()
-        target_date = self.parse_date(date_str)
-
-        
-        if isinstance(user, Guest):
-            if target_date != now:
-                raise ValueError("Walk-in guests can only book for the same day")
-
-       
-        diff_days = (target_date - now).days
-
-
-        limit = user.tier.booking_day_limit
-        if diff_days > limit:
-            raise ValueError(f"{user.name} ({user.tier.name}) can only book up to {limit} days in advance. You tried to book {diff_days} days ahead.")
-        
-    def check_5_hour_rule(self, identifier: str, new_date: str, new_time: str):
-        
-        target_dt = self.robust_parse_datetime(f"{new_date} {new_time}")
-        std_new_date = target_dt.strftime("%d-%m-%Y")
-        
-        new_dt = self.parse_datetime(new_date, new_time)     
-           
-        for b in self.__bookings:
-            # กรองเฉพาะคิวที่ไม่ได้ยกเลิก และ จองในวันเดียวกัน
-            if b.status.value != "CANCELLED" and b.slot.play_date == std_new_date:
-                existing_dt = self.robust_parse_datetime(f"{b.slot.play_date} {b.slot.time}")
-                time_diff = abs((new_dt - existing_dt).total_seconds()) / 3600
-                
-                if time_diff < 5:
-                    for g in b.golfers:
-                        #เช็คคลุมทั้ง user_id (Member) และเบอร์โทร (Walk-in) 
-                        if g.user_id == identifier or getattr(g, 'phone', '') == identifier:
-                            return False # ปฏิเสธการจอง (เจอคิวซ้ำ)
-        return True 
-    
     def create_booking(self, requester_id: str, course_id: str, date: str, time: str, companion_ids: list = None):
         if companion_ids is None:
             companion_ids = []
@@ -686,29 +631,6 @@ class GreenValleySystem:
         
         return True 
     
-    def process_registration_payment(self, member_id: str, tour_id: str):
-        """จัดการชำระเงินค่าสมัครทัวร์นาเมนต์และเพิ่มชื่อผู้เข้าแข่งขัน"""
-        tour = self.find_tournament(tour_id)
-        member = self.find_user(member_id)
-
-        if any(entry.id == member.id for entry in tour.registered_players):
-            raise ValueError("Already registered for this tournament.")
-
-        if tour.status != TournamentStatus.REGISTRATION_OPEN:
-            raise ValueError(f"Tournament registration is {tour.status.value}")
-
-        self.process_payment(booking=None, tour=tour, member=member) 
-
-        tour.add_player(member)
-
-        msg = f"Payment Successful for {tour.name}. Amount: {tour.entry_fee} THB"
-        member.add_notification(Notification(msg))
-
-        return {
-            "status": "SUCCESS",
-            "message": msg
-        }
-    
     def end_tournament(self, tour_id):
         tour = self.find_tournament(tour_id)
         if not tour: 
@@ -791,30 +713,3 @@ class GreenValleySystem:
             "current_status": user.status.value,
             "message": "บันทึก Strike เรียบร้อยแล้ว"
         }
-
-    def get_user_payment_history(self, user_id: str):
-       
-        history = []
-        for p in self.__payments:
-            if p.member and p.member.id == user_id:
-                history.append({
-                    "payment_id": p.payment_id,
-                    "type": p.get_type,
-                    "amount": p.amount,
-                    "status": p.status.value,
-                    "time": p.time
-                })
-        return history
-    
-    def get_booking_transaction_details(self, booking_id: str):
-        booking = self.find_booking(booking_id)
-        if not booking:
-            raise ValueError(f"ไม่พบการจองรหัส {booking_id}")
-
-        if booking.status.value == "CONFIRMED_PAID":
-            payment = next((p for p in self.__payments if getattr(p, 'booking_id', None) == booking_id), None)
-            if payment and payment.get_transaction_details():
-                return payment.get_transaction_details()
-        
-        total_price, msg = booking.calculate_total_price(0.0) 
-        return msg

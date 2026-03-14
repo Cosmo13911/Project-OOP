@@ -12,10 +12,6 @@ class Hole:
     def number(self):  
         return self.__number
 
-    @property
-    def par(self):
-        return self.__par
-
 class Course:
     def __init__(self, course_id, name, fee_morning, fee_afternoon, course_type, rating, slope_rating, open_time="06:00", close_time="18:00"):
         self.__id = course_id

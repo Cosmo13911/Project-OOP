@@ -20,14 +20,6 @@ class History:
         return self.__score_card
 
     @property
-    def round_type(self):
-        return self.__round_type
-
-    @property
-    def date(self):
-        return self.__date
-
-    @property
     def gross_score(self):
         return self.__gross_score
 
@@ -35,9 +27,6 @@ class History:
     def adjusted_score(self):
         return self.__adjusted_score
 
-    @property
-    def course(self):
-        return self.__score_card.course
     
 # 1. Abstract Class
 class User(ABC):

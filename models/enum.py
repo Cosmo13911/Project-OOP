@@ -18,11 +18,6 @@ class PaymentStatus(Enum):
     PENDING = "PENDING"
     SUCCESS = "SUCCESS"
 
-class PaymentMethod(str, Enum):
-    CREDIT_CARD = "CREDIT_CARD"
-    QR_CODE = "QR_CODE"
-    CASH = "CASH"
-
 class RainCheckStatus(Enum):
     VALID = "VALID"
     USED = "USED"
@@ -71,7 +66,3 @@ class CaddyLevel(str, Enum):
     REGULAR = "REGULAR"
     PRO = "PRO"
     
-class RainCheckStatus(Enum):
-    VALID = "VALID"
-    USED = "USED"
-    EXPIRED = "EXPIRED"
